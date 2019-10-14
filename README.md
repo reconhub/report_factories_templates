@@ -36,10 +36,9 @@ the following:
 
 ### How to use it?
 
-Download the factory, make sure the **reportfactory** is installed, then:
+Clone or [download](https://github.com/reconhub/report_factories_templates/archive/master.zip) the factory, make sure the **reportfactory** is installed, then:
 
 1. put your datasets in `data/data_comparison`
-
 
 2. open **R** in the root factory folder or simply double-click on the
    `open.Rproj` file
