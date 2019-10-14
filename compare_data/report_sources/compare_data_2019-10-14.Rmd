@@ -1,0 +1,521 @@
+---
+title: "`r paste('Compare VHF databases -', params$type)`"
+author: "Thibaut Jombart"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: zenburn
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+    toc_collapse: no
+    toc_depth: 2
+    toc_float: yes
+    css: !expr here::here('css', 'style.css')
+---
+
+<div class="report_meta">
+  
+**Maintainer:** Thibaut Jombart (thibautjombart@gmail.com)
+
+**Code contributors:** Thibaut Jombart, Amy Gimma
+
+**Data contributors:** ...
+
+**Version:** 1.0.0
+
+</div>
+
+
+
+<br>
+
+To compile this report with a specific data type:
+
+1. double-click on the `open.Rproj` files at the root of the *reportfactory* to open Rstudio
+
+2. in Rstudio, run the command: 
+
+```{r eval = FALSE}
+
+reportfactory::compile_report("compare_data_2019-10-14",
+                              params = list(type = "xxx"),
+                              clean_report_sources = TRUE)`
+
+```
+
+where you can replace `xxx` by a character string identifying the type of
+dataset to use. Make sure the data to compare are stored in
+`data/data_comparison/`.
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+
+
+<!-- ======================================================= -->
+## Outline
+
+### Data used
+
+What is the source of your data? Does it need running some previous reports like
+preliminary data cleaning? If so, list these reports here.
+
+### Method
+
+The data preparation involves the following steps, detailed in the following tabs:
+
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc.
+
+* **Clean data**: this section contains *ad hoc* data cleaning, i.e. which is
+  not used in other reports (otherwise cleaning should be done in a dedicated
+  report); this section is also used to create new variables used in the
+  analyses
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+
+## Load packages
+
+This part loads required packages. Note that this could be outsourced in a
+separate script in `scripts/`, but the advantage of putting pakages here is: i)
+we explicitely know what is used and ii) `reportfactory::install_deps()` will
+detect these dependencies and install them if needed.
+
+```{r load_packages}
+
+library(tidyverse) # overkill but easier
+library(compareDF) # data.frame comparison
+library(linelist) # data structure comparison
+library(here) # find files
+library(rio) # import / export
+library(DT) # print interactive tables
+
+```
+
+
+## Load scripts
+
+These scripts will load:
+
+* all local scripts, stored as `.R` filesinside `/scripts/`
+* (optional) all global scripts, i.e. stored outside the factory in
+  `../global_scripts/`
+
+```{r read_scripts}
+
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$",
+                     full.names = TRUE)
+for (file in scripts_files) source(file, local = TRUE)
+
+```
+
+
+
+
+<!-- ======================================================= -->
+## Load data
+
+In this section, we:
+
+* look for data files in the `data/data_comparison` folder
+* find the two latest datasets
+* read them into `x_old` and `x_new`
+
+
+```{r load_data}
+
+## load the data
+data_comparison_folder <- here("data", "data_comparison")
+
+## find order of the files
+all_files <- list.files(data_comparison_folder,
+                        pattern = params$type,
+                        ignore.case = TRUE)
+file_order <- all_files %>%
+  guess_dates() %>%
+  order(decreasing = TRUE)
+
+new_file <- here("data", "data_comparison", all_files[file_order[1]])
+old_file <- here("data", "data_comparison", all_files[file_order[2]])
+
+
+x_new <- rio::import(new_file) %>% as_tibble()
+x_old <- rio::import(old_file) %>% as_tibble()
+
+
+## extract database date from the file name
+new_file_date <- gsub("^[^.]+/", "", new_file) %>% guess_dates()
+old_file_date <- gsub("^[^.]+/", "", old_file) %>% guess_dates()
+
+```
+
+The **completion dates** of the databases are:
+
+* old data: **`r format(old_file_date, format = "%A %d %b %Y")`**.
+* new data: **`r format(new_file_date, format = "%A %d %b %Y")`**.
+
+
+
+
+<!-- ======================================================= -->
+## Data cleaning
+
+To keep the original data unchanged as much as possible, we only clean the dates
+of `date_report`, needed for further subsetting of the data:
+
+```{r clean}
+
+x_new <- x_new %>% clean_data()
+x_old <- x_old %>% clean_data()
+
+```
+
+
+
+
+<!-- ======================================================= -->
+## Scales and colors
+
+We define custom colors for the output of `compare_df`.
+
+```{r colors}
+
+comp_colors <- c(addition = "#1FC46F",
+                 removal = "#F94444",
+                 unchanged_cell = "#7C8AA4",
+                 unchanged_row = "#7C8AA4")
+
+```
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# Data comparison {.tabset .tabset-fade .tabset-pills}
+
+<!-- ======================================================= -->
+## Explanations
+
+The data comparison includes the following:
+
+* **structure comparison:** look for differences in dimensions, and names,
+  ordering and types of the variables
+  
+* **duplicates:** look for duplicated IDs, and identify the corresponding
+  entries; this includes a comparison of the duplicates between old and new
+  datasets
+  
+* **changes in cases:** look for changes in cases, showing changes in colors
+  into a separate html table
+  
+
+
+
+<!-- ======================================================= -->
+## Struture comparison
+
+In this part we use *linelist*'s function `compare_data` to compare the
+structures of the two datasets: which variables, of which types, did some
+variable disappear etc.
+
+```{r structure_comparison}
+
+compare_data(x_old, x_new, use_values = FALSE)
+
+```
+
+
+
+
+
+<!-- ======================================================= -->
+## Looking for duplicates: old data
+
+In this section, we look for duplicated identifiers, and output a table of the
+corresponding individuals.
+
+```{r duplicates_old}
+
+to_keep <- x_old %>%
+  filter(duplicated(id)) %>%
+  pull(id)
+
+duplicates_old <- x_old %>%
+  filter(id %in% to_keep)
+
+if (nrow(duplicates_old) > 0) {
+  duplicates_old %>%
+    show_table()
+}
+
+```
+
+
+
+
+<!-- ======================================================= -->
+## Looking for duplicates: new data
+
+In this section, we look for duplicated identifiers, and output a table of the
+corresponding individuals.
+
+```{r duplicates_new}
+
+to_keep <- x_new %>%
+  filter(duplicated(id)) %>%
+  pull(id)
+
+duplicates_new <- x_new %>%
+  filter(id %in% to_keep)
+
+if (nrow(duplicates_new) > 0) {
+  duplicates_new %>%
+    show_table()
+}
+
+```
+
+
+
+
+<!-- ======================================================= -->
+## Changes in duplicates
+
+In this part we compare duplicated entries between the *old* and the *new*
+dataset. Note that the table display in this document is sub-optimal. Click on
+the link below to open the table.
+
+**Color code**:
+
+* <font color="#7C8AA4">No change</font>
+* <font color="#F94444">Removal (in old file, not in the new one)</font>
+* <font color="#1FC46F">Addition (in new file, not in old one)</font>
+
+
+
+<a href="tables/comparison_duplicates_table.html" target="_blank" class="button" >Open comparison table</a>
+
+<font color="#0B9A86">**Important:**the file will open in your web browser by
+default; for even better visualisation, we recommend going to the `tables/`
+folder and opening `comparison_duplicates_table.html` with **Excel** </font>
+
+```{r comparison_duplicates, results = "asis"}
+  
+comparison_duplicates <- compareDF::compare_df(
+                                        duplicates_new,
+                                        duplicates_old,
+                                        group_col = "id",
+                                        limit_html = 1000,
+                                        color_scheme = comp_colors,
+                                        keep_unchanged_rows = TRUE,
+                                        stop_on_error = FALSE)
+
+```
+
+
+
+
+
+
+
+<!-- ======================================================= -->
+## Changes in cases
+
+In this section we look for changes in cases between the two versions of the
+dataset, using the *compareDF* package to check which entries of the data have
+changed. This is computer-intensive work. To make it run under reasonable time,
+we restrict the comparisons to cases reported within the last 42 days (*Filter*
+section).
+
+Note that the table display in this document is sub-optimal. Click on
+the link below to open the table.
+
+**Color code**:
+
+* <font color="#7C8AA4">No change</font>
+* <font color="#F94444">Removal (in old file, not in the new one)</font>
+* <font color="#1FC46F">Addition (in new file, not in old one)</font>
+
+<a href="tables/comparison_table.html" target="_blank" class="button" >Open comparison table</a>
+
+<font color="#0B9A86">**Important:** the file will open in your web browser by
+default; for even better visualisation, we recommend going to the `tables/`
+folder and opening `comparison_duplicates_table.html` with **Excel** </font>
+
+
+```{r comparison, results = "asis"}
+
+comparison <- compareDF::compare_df(
+                             x_new,
+                             x_old,
+                             group_col = "id",
+                             limit_html = 1000,
+                             color_scheme = comp_colors,
+                             stop_on_error = FALSE)
+
+```
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# Export tables {.tabset .tabset-fade .tabset-pills}
+
+
+<!-- ======================================================= -->
+## Create output directory
+
+We create a directory called `tables/` to store output files, if it does not
+exist.
+
+```{r create_tables_dir}
+
+if (!dir.exists("tables")) {
+  dir.create("tables")
+}
+
+```
+
+
+<!-- ======================================================= -->
+## Create output files
+
+The following items are exported:
+
+```{r exports}
+
+writeLines(comparison_duplicates$html_output,
+           con = file.path("tables",
+                           "comparison_duplicates_table.html"),
+    useBytes = TRUE)
+
+writeLines(comparison$html_output,
+           con = file.path("tables",
+                            "comparison_table.html"),
+           useBytes = TRUE)
+
+if (nrow(duplicates_old) > 0) {
+  rio::export(duplicates_old, file = file.path("tables",
+                                               "duplicates_old.xlsx"))
+}
+
+if (nrow(duplicates_new) > 0) {
+  rio::export(duplicates_new, file = file.path("tables",
+                                               "duplicates_new.xlsx"))
+}
+
+```
+
+
+
+
+<!-- ======================================================= -->
+## Links to output files
+
+Click on the links below to open items:
+
+**Changes in cases:**
+
+* [comparison_duplicates_table](tables/comparison_duplicates_table.html): html table of comparisons amongst old and new duplicates
+
+* [comparison_table](tables/comparison_table.html): html table of comparisons amongst old and new cases
+
+
+**Duplicates:**
+
+* [duplicates_old](tables/duplicates_old.xlsx): Excel file containing duplicated entries (old dataset)
+
+* [duplicates_new](tables/duplicates_new.xlsx): Excel file containing duplicated entries (new dataset)
+
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# System information {.tabset .tabset-fade .tabset-pills}
+
+
+<!-- ======================================================= -->
+## Outline
+
+The following information documents the system on which the document was
+compiled.
+
+
+
+<!-- ======================================================= -->
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+
+
+<!-- ======================================================= -->
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+
+R.version
+
+```
+
+
+
+
+<!-- ======================================================= -->
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+
+sessionInfo()
+
+```
+
+
+
+<!-- ======================================================= -->
+## Compilation parameters
+
+This provides information on the parameters (passed through `params`) used for
+compiling this document:
+
+```{r params}
+
+params
+
+```
