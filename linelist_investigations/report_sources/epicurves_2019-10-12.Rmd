@@ -1,0 +1,2022 @@
+---
+title: "General epidemic curves"
+author: "Thibaut Jombart, Christopher Jarvis, Patrick Keating, Sham Lal, Charlie Whittaker, and Amy Gimma for the epi analysis cell - EOC Goma"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: pygments
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+    toc_collapse: no
+    toc_depth: 2
+    toc_float: yes
+    css: !expr here::here('css', 'style.css')
+---
+
+
+
+<br>
+
+<div class="report_meta">
+  <span class="notice">**Notice**: this is a **stable, routine report**. 
+  **Do not touch it unless it is broken.** To make a contribution, **carefully read 
+  the [README](../../../../../README.html) file**.</span>
+  
+  **Maintainer:** Thibaut Jombart (thibautjombart@gmail.com)
+  
+  **Code contributors:** Thibaut Jombart, Christopher Jarvis, Patrick Keating, Sham
+  Lal, Charlie Whittaker, Amy Gimma
+  
+  **Data contributors:** Yannick Tutu, Richie Ngombo
+  
+  **Version:** 2.1.0
+  
+  **Reviewed by:** Amy Gimma
+</div>
+
+
+
+
+
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This report produces basic epicurves by dates of onset or reporting, with
+various stratification, from the cleaned Master linelist database.
+
+### Data used
+
+This report uses the latest cleaned Master linelist data.
+
+### Method
+
+The data preparation involves the following steps, detailed in the following
+tabs:
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc.
+
+* **Add new variables**: addition of new variables to the Master linelist database, like top
+  affected health zones.
+
+* **Filter the data**: keep only relevant confirmed and probable cases, possibly
+  removing erroneous dates, for further analysis
+
+
+
+<!-- ====================================================== -->
+## Load scripts
+
+These scripts will load:
+
+* all local scripts, stored as `.R` filesinside `/scripts/`
+* all global scripts, i.e. stored outside the factory in `../scripts/`
+* the path to the cleaned MDC data stored as `x`
+
+**Important**: we need to make sure the soucing of `R` scripts is done using the
+current environment, using the argument `local = TRUE`. This is in particular
+essential when `params` is used, as some functions and settings are dependent
+upon it.
+
+```{r read_scripts}
+
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$", full.names=TRUE)
+for (file in scripts_files) source(file, local = TRUE)
+
+ggthemr("grape")
+
+## show parameters
+params
+
+```
+
+
+
+
+<!-- ====================================================== -->
+## Load data
+
+We extract the completion date from the file name:
+
+```{r load_data}
+
+current_clean_data
+x <- rio::import(current_clean_data)
+
+file_name <- gsub("^[^.]+/", "", current_clean_data)
+database_date <- file_name %>%
+  guess_dates()
+database_date
+
+```
+
+The **completion date** of the database is **`r format(database_date, format =
+"%A %d %b %Y")`**.
+
+
+
+<!-- ====================================================== -->
+## Add new variables
+
+* `top_zones` which retains the top 7 health zones (with
+most cases since the beginning of the outbreak), and pool everything else into
+'others'.
+
+* `top_zones_recent_report` which retains the top 7 health zones with 
+the most cases in the past 21 days by or date of report.
+
+* `top_zones_recent_onset` which retains the top 7 health zones with 
+the most cases in the past 21 days by or date of report.
+
+```{r add_new_variables}
+
+## Major health zones
+## Defined for the entire outbreak, and for the last 21 days
+
+recent_date <- database_date - 21
+recent_report <- x$date_report >= recent_date
+recent_onset <- x$date_onset >= recent_date
+
+x <- x %>%
+  mutate(top_zones = top_values(zone_de_sante, 6),
+         top_zones_recent_report =
+           top_values(zone_de_sante, 6, subset = recent_report),
+         top_zones_recent_onset =
+           top_values(zone_de_sante, 6, subset = recent_onset))
+
+
+## force level order for transmission place
+levels(x$transmission_place_group) <-  c("multiple", 
+                                         "non_enregistre",
+                                         "communautaire",
+                                         "nosocomial")
+
+## Community death
+x <- x %>% mutate(community_death =
+                    ifelse(type_death == "community", "oui", "non"),
+                  community_death = factor(community_death,
+                                           levels = c("oui", "non")))
+
+## Force levels for contact status
+x <- x %>% mutate(report_status =
+                    factor(report_status,
+                           levels = c("dead", "inconnu", "alive")))
+                  
+
+```
+
+
+
+<!-- ====================================================== -->
+## Filter data 
+
+We keep only data with:
+
+- `epicasedef`: `confirmed` and `probable`
+
+```{r filter}
+
+to_keep <- c("confirmed", "probable")
+
+x <- x %>%
+  filter(epicasedef %in% to_keep) 
+
+```
+
+We check the total cases counts:
+
+```{r check_case_counts}
+
+x %>%
+  group_by(epicasedef) %>%
+  summarise(n = n()) %>%
+  adorn_totals("row")
+
+```
+
+
+
+<!-- ====================================================== -->
+## Custom color palettes
+
+In this section we define color palettes for use in the graphics of other
+sections.
+
+```{r palettes}
+
+scale_community_death <-   scale_fill_manual(
+    name = "Décès communautaire",
+    values = c(non = "#adad85", oui = "#bf4040"),
+    labels = c(non = "Non", oui = "Oui"))
+
+scale_zone_de_sante <- scale_fill_manual(
+    name = "",
+    values = c(
+      "beni" = "#248f8f",
+      "butembo" = "#adad85",
+      "kalunguta" = "#e5bd4c",#,
+      "katwa" = "#b3003b",#,
+      "komanda" = "#61b463",
+      "lolwa" = "#9b3950",
+      "mabalako" = "#ff944d",#,
+      "mambasa" = "#4C8659", #
+      "mandima" = "#8cb3d9",#,
+      "oicha" = "#264d73",#,
+      "other" = "#b3b3b3"
+    )
+)
+
+scale_sous_coordination <- scale_fill_manual(
+    name = "",
+    values = c(beni = "#248f8f",
+               bukavu = "#e5bd4c",
+               bunia = "#267326",
+               butembo = "#adad85",
+               goma = "#66a3ff",
+               komanda = "#61b463",
+               mambasa = "#b3003b",
+               mangina = "#ff4d4d",
+               tchomia = "#ff944d"),
+    labels = c(beni = "Beni",
+               bukavu = "Bukavu",
+               bunia = "Bunia",
+               butembo = "Butembo",
+               goma = "Goma",
+               komanda = "Komanda",
+               mambasa = "Mambasa",
+               mangina = "Mangina",
+               tchomia = "Tchomia"))
+
+scale_sous_coordination <- scale_fill_manual(
+    name = "",
+    values = c(beni = "#248f8f",
+               bukavu = "#e5bd4c",
+               bunia = "#267326",
+               butembo = "#adad85",
+               goma = "#66a3ff",
+               komanda = "#61b463",
+               mambasa = "#b3003b",
+               mangina = "#ff4d4d",
+               tchomia = "#ff944d"),
+    labels = c(beni = "Beni",
+               bukavu = "Bukavu",
+               bunia = "Bunia",
+               butembo = "Butembo",
+               goma = "Goma",
+               komanda = "Komanda",
+               mambasa = "Mambasa",
+               mangina = "Mangina",
+               tchomia = "Tchomia"))
+
+scale_hcf <-   scale_fill_manual(
+    name = "",
+    values = c(multiple = "#99994d", 
+               non_enregistre = "#bfbfbf",
+               communautaire = "#8cb3d9",
+               nosocomial = "#264d73"),
+    labels = c(multiple = "plusieurs sites", 
+               non_enregistre = "non-enregistré",
+               communautaire = "communautaire",
+               nosocomial = "nosocomial"))
+
+
+scale_contact_status <-   scale_fill_manual(
+    name = "",
+    values = c(contact_inconnu = "#726200",
+               non_enregistre = "#DAC856",
+               connu_non_suivi = "#6C79B0",
+               suivi = "#09174D" 
+               ),
+    labels = c(contact_inconnu = "Contact non connu",
+               non_enregistre = "Non enregistré",
+               connu_non_suivi = "Connu, non suivi",
+               suivi = "Suivi" 
+               ))
+
+scale_notification_status <- scale_fill_manual(
+    name = "",
+    values = c(dead = "#ff5050",
+               inconnu = "#b3b3b3",
+               alive = "#9999ff"),
+    labels = c(dead = "décédé",
+               inconnu = "inconnu",
+               alive = "vivant"))
+
+scale_vaccination <- scale_fill_manual(
+    name = "",
+    values = c(no = "#ffa31a",
+               unknown = "#b8b894",
+               yes = "#40bf80"),
+    labels = c(no = "non-vacciné",
+               unknown = "inconnu",
+               yes = "vacciné"))
+
+```
+
+
+
+
+
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+
+# Overall summary {.tabset .tabset-fade .tabset-pills}
+
+<!-- ====================================================== -->
+## Outline
+
+This section provides a text summary of case counts based on dates of reporting,
+which is automatically generated from the data, as well as various tables of
+case counts.
+
+<!-- ====================================================== -->
+## Text summary
+
+```{r i}
+
+i <- incidence(x$date_report)
+i
+find_peak(i)
+
+i_7 <- incidence(x$date_report, 7)
+i_7
+find_peak(i_7)
+
+```
+
+As of **`r format(database_date, format = "%A %d %b %Y")`**, there has been a
+total of **`r sum(get_counts(i))`** cases, with a peak daily incidence of 
+**`r max(get_counts(i))`** cases reported on the **`r format(find_peak(i), format = "%a
+%d %b %Y")`**, and a peak weekly incidence of **`r max(get_counts(i_7))`** cases
+reported on the week starting on the **`r format(find_peak(i_7), format = "%a %d %b %Y")`**.
+
+
+## Confirmed/probable case counts by outcome
+
+```{r table_epicasedef_outcome}
+
+table_epicasedef_outcome <- x %>%
+  group_by(epicasedef, outcome) %>%
+  tally() %>%
+  spread(outcome, n, fill = 0) %>%
+  mutate(total = dead + recovered,
+         cfr = prop_to_perc(dead / total),
+         lower_ci = prop_ci(dead, total, "lower", TRUE),
+         upper_ci = prop_ci(dead, total, "upper", TRUE))
+
+table_epicasedef_outcome %>%
+  show_table(params = params)
+  
+```
+
+
+
+<!-- ====================================================== -->
+## Confirmed/probable case counts by sub-coordination
+
+```{r table_epicasedef_sous_coordination}
+
+table_epicasedef_sous_coordination <- x %>%
+  group_by(sous_coordination, epicasedef) %>%
+  summarise(n = n()) %>%
+  spread(epicasedef, n, fill = 0) %>%
+  adorn_totals(c("row", "col"))
+
+table_epicasedef_sous_coordination %>%
+  show_table(params = params)
+  
+```
+
+
+## Confirmed/probable case counts per health zone
+
+```{r table_cases_zones}
+
+table_cases_zones <- x %>%
+  group_by(zone_de_sante, epicasedef) %>%
+  summarise(n = n()) %>%
+  spread(epicasedef, n, fill = 0) %>%
+  adorn_totals(c("row", "col"))
+
+table_cases_zones %>%
+  show_table(params = params)
+
+```
+
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+
+# Analyses by dates of onset {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This section produces various *epicurves*, i.e. plots of case counts by time
+intervals and for various stratifications.
+
+
+## By epicasedef
+
+### Figure: epicurve by onset and epicasedef
+
+```{r figure_onset_epicasedef, fig.width = 10}
+
+i_onset_epicasedef <- incidence(x$date_onset, 7, groups = x$epicasedef)
+
+plot(i_onset_epicasedef, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  scale_fill_discrete(name = "Statut du cas",
+                      breaks = c("confirmed", "probable"),
+                      labels = c("Confirmé","Probable")) +
+  large_txt +
+  theme(legend.title = element_blank(),
+        legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+
+```
+
+
+### Table: weekly case counts by onset and epicasedef
+
+```{r table_onset_epicasedef}
+
+table_onset_epicasedef <- i_onset_epicasedef %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_onset_epicasedef %>%
+  show_table(params = params)
+
+```
+
+
+
+<!-- ====================================================== -->
+## By sub-coordination
+
+### Figure: epicurve by week of onset and sub-coordination
+
+```{r figure_onset_sous_coordination, fig.width = 10}
+
+i_onset_sous_coordination <- incidence(x$date_onset, 7,
+                                       groups = x$sous_coordination)
+
+plot(i_onset_sous_coordination, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  guides(fill = guide_legend(ncol = 4)) +
+  large_txt +
+  theme(legend.title = element_blank(),
+        legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+  scale_sous_coordination +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+
+### Figure: epicurve by onset and sub-coordination (variant)
+
+```{r figure_onset_sous_coordination_variant, fig.width = 10, fig.height = 8}
+
+plot(i_onset_sous_coordination, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  guides(fill = FALSE) +
+  large_txt +
+  scale_sous_coordination +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  facet_grid(groups ~ .) +
+  custom_vert_facet +
+  theme(strip.text.y = element_text(size = 12, angle = 0)) +
+  scale_months
+
+```
+
+### Table: weekly case counts by onset and sous_coordination
+
+```{r table_onset_sous_coordination}
+
+table_onset_sous_coordination <- i_onset_sous_coordination %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_onset_sous_coordination %>%
+  show_table(params = params)
+
+```
+
+
+
+## By health zones
+
+### Table: weekly case counts by week of onset and health zone
+
+```{r table_onset_zone_de_sante}
+
+i_onset_zone_de_sante <- incidence(x$date_onset, 7,
+                                   groups = x$zone_de_sante)
+i_onset_zone_de_sante
+
+table_onset_zone_de_sante <- i_onset_zone_de_sante %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_onset_zone_de_sante %>%
+  show_table(params = params)
+
+```
+
+
+
+<!-- ====================================================== -->
+## By major health zone weekly
+
+Major health zones are defined as the health zones with the highest case counts.
+
+### Figure: weekly case counts by major zone
+
+```{r figure_onset_top_zones, fig.width = 10}
+
+i_onset_top_zones <- incidence(x$date_onset, 7, groups = x$top_zones)
+
+plot(i_onset_top_zones, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  guides(fill = guide_legend(ncol = 4)) +
+  theme(legend.title = element_blank(),
+        legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(
+            fill = "transparent",
+            color = "white")) +
+  scale_fill_discrete() +
+  large_txt + 
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months +
+  scale_zone_de_sante
+
+```
+
+
+### Figure: Weekly case counts by major zone
+
+```{r figure_onset_top_zones_variant, fig.width = 10, fig.height = 8}
+
+df_onset_top_zones <- as.data.frame(i_onset_top_zones, long = TRUE) 
+
+ggplot(df_onset_top_zones,
+       aes(x = dates, y = counts, fill = groups)) +
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  rotate_x_text(45) +
+  large_txt +
+  scale_fill_discrete(guide = FALSE) +
+  theme(legend.position = "bottom") +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       x = "",
+       y = "Nombre de nouveaux cas par semaine") +
+  facet_grid(groups ~ .) +
+  custom_vert_facet +
+  scale_months +
+  scale_zone_de_sante
+
+```
+
+
+
+<!-- ============+ -->
+
+<!-- ====================================================== -->
+## By top recent onset health zone - weekly
+
+Major health zones in this analyasis are defined as the health zones with the
+highest case counts in the past 21 days
+
+### Figure: Weekly case counts by top recent onset major health zone
+
+```{r figure_onset_top_zones_21_days, fig.width = 10}
+
+i_onset_top_zones_21_days <- incidence(x$date_onset, 7, 
+                                       groups = x$top_zones_recent_onset)
+
+plot(i_onset_top_zones_21_days, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  guides(fill = guide_legend(ncol = 4)) +
+  theme(legend.title = element_blank(),
+        legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(
+            fill = "transparent",
+            color = "white"
+        )) +
+  # scale_fill_discrete() +
+  large_txt + 
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months + 
+  scale_zone_de_sante
+
+```
+
+### Figure: Weekly case counts by major recent onset zone (variant fixed y-scale)
+
+```{r figure_recent_onset_top_zones_variant_recent_fixed, fig.width = 10, fig.height = 8}
+
+df_onset_top_zones <- as.data.frame(i_onset_top_zones_21_days, long = TRUE) 
+df_onset_top_zones <- df_onset_top_zones %>% filter(groups != "other")
+
+ggplot(df_onset_top_zones,
+       aes(x = dates, y = counts, fill = groups)) +
+  theme_bw() +
+  geom_bar(stat = "identity") +
+  facet_grid(groups ~ .) +
+  custom_vert_facet +
+  rotate_x_text(45) +
+  large_txt +
+  scale_fill_discrete(guide = FALSE) +
+  theme(legend.position = "bottom") +
+  scale_y_continuous(breaks = int_breaks) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       x = "",
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months + 
+  scale_zone_de_sante
+
+
+```
+
+
+### Figure: Weekly case counts by major recent onset zone (variant free y-s cale)
+
+```{r figure_recent_onset_top_zones_variant_recent_free, fig.width = 10, fig.height = 8}
+
+df_onset_top_zones <- as.data.frame(i_onset_top_zones_21_days, long = TRUE) 
+df_onset_top_zones <- df_onset_top_zones %>%
+                            filter(groups != "other")
+
+ggplot(df_onset_top_zones,
+       aes(x = dates, y = counts, fill = groups)) +
+  theme_bw() +
+  geom_bar(stat = "identity") +
+  facet_grid(groups ~ .) +
+  custom_vert_facet +
+  rotate_x_text(45) +
+  large_txt +
+  theme(legend.position = "bottom") +
+  scale_y_continuous(breaks = pretty_breaks(n = 3)) +
+  scale_fill_discrete(guide = FALSE) +
+  scale_y_continuous(breaks = pretty_breaks(n = 3)) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar date de début de symptômes à la date de", " ", 
+                      format(database_date, "%d/%m/%Y")),
+       x = "",
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months +
+  scale_zone_de_sante
+
+```
+
+
+
+### Table: Weekly case counts by major health zone
+
+```{r table_onset_top_zones_weekly}
+
+table_onset_top_zones_weekly <- i_onset_top_zones %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_onset_top_zones_weekly %>%
+  show_table(params = params)
+
+```
+
+
+<!-- ============+ -->
+<!-- ====================================================== -->
+## By top recent onset health zone - daily
+
+Major health zones in this analyasis are defined as the health zones with the
+highest case counts in the past 21 days
+
+### Figure: Daily case counts by top recent onset health zone
+
+```{r figure_recent_onset_top_zones_daily, fig.width = 10}
+
+recent_onset <- x %>% filter(date_onset > database_date - 63)
+i_onset_top_zones_21_days <- 
+  incidence(recent_onset$date_onset,
+            1, 
+            groups = recent_onset$top_zones_recent_onset)
+
+
+plot(i_onset_top_zones_21_days, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  guides(fill = guide_legend(ncol = 4)) +
+  theme(legend.title = element_blank(),
+        legend.position = "bottom",
+        legend.justification = "center"
+       ) +
+  scale_zone_de_sante +
+  large_txt + 
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_weeks +
+  scale_y_continuous(
+    breaks = c(1, 5, 10), minor_breaks = 1:10)
+
+```
+
+### Table: Daily case counts by onset and sous coordination
+
+```{r table_recent_onset_zone_de_sante_daily}
+table_recent_onset_zone_de_sante_daily <- i_onset_top_zones_21_days %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_recent_onset_zone_de_sante_daily %>%
+  show_table(params = params)
+
+```
+
+### Figure: Past 21 days weekly case counts by major zone, same y-axis (variant)
+
+```{r figure_recent_onset_top_zones_variant_all, fig.width = 10, fig.height = 8}
+
+df_onset_top_zones <- as.data.frame(i_onset_top_zones_21_days, long = TRUE) 
+df_onset_top_zones <- df_onset_top_zones
+
+ggplot(df_onset_top_zones,
+       aes(x = dates, y = counts, fill = groups)) +
+  theme_bw() +
+  geom_bar(stat = "identity") +
+  facet_grid(groups ~ .) +
+  custom_vert_facet +
+  rotate_x_text(45) +
+  scale_zone_de_sante +
+  scale_y_continuous(breaks = c(1, 5 ,10), minor_breaks = 1:10) +
+  theme(legend.position = "bottom") +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       x = "",
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_weeks +
+  large_txt
+
+```
+
+
+
+
+### Table: Daily case counts by major health zone
+
+```{r table_onset_top_zones_daily}
+table_onset_top_zones_daily <- i_onset_top_zones %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_onset_top_zones_daily %>%
+  show_table(params = params)
+
+```
+
+
+
+<!-- ====================================================== -->
+## By mode of transmission
+
+### Figure: epicurve by onset and transmission_place
+
+```{r figure_onset_nosocomial, fig.width = 10}
+
+i_onset_nosocomial <- incidence(x$date_onset, 7, 
+                                 groups = x$transmission_place_group)
+
+plot(i_onset_nosocomial, border = "white") +
+  theme_bw() +
+  scale_hcf +
+  rotate_x_text(45) +
+  large_txt +
+  theme(legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+   labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar site de transmission à la date de", " ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+
+### Figure: epicurve by onset and transmission_place (variant)
+
+This repeats the previous figure by major recent health zones
+
+```{r figure_onset_nosocomial_variant, fig.width = 10, fig.height = 8}
+# REVIEW
+
+x %>% filter(top_zones_recent_onset != "other") %>% 
+ggplot(aes(x = epiweek_onset_label, fill = transmission_place_group)) +
+  geom_bar(alpha = .7) +
+  theme_bw() +
+  scale_hcf +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(top_zones_recent_onset ~ .) +
+  custom_vert_facet +
+  theme(legend.position = "bottom") +
+   labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar site de transmission à la date de", " ", 
+                      format(database_date, "%d/%m/%Y")),
+        y = "Nombre de nouveaux cas par semaine",
+        x = "") +
+  scale_months
+
+```
+
+
+
+### Table: weekly case counts by onset and transmission place
+
+```{r table_onset_nosocomial_onset}
+
+table_onset_nosocomial <- i_onset_nosocomial %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_onset_nosocomial %>%
+  show_table(params = params)
+
+```
+
+
+
+
+<!-- ====================================================== -->
+## By status at notification
+
+### Figure: epicurve by onset and status at notification
+
+```{r figure_onset_notification_status, fig.width = 10}
+
+i_onset_notification_status <- incidence(x$date_onset,
+                                         7,
+                                         groups = factor(x$report_status))
+
+plot(i_onset_notification_status, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  scale_notification_status +
+  large_txt +
+  theme(legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(
+          fill = "transparent",
+          color = "white")) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar statut à la notification à la date de", " ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+
+```
+
+
+
+### Figure: epicurve by onset and status at notification (variant)
+
+This repeats the previous figure by major recent health zones
+
+```{r figure_onset_notification_status_variant, fig.width = 10, fig.height = 8}
+
+# REVIEW
+x %>% filter(top_zones_recent_onset != "other") %>% 
+ggplot(aes(x = epiweek_onset_label, fill = report_status)) +
+  geom_bar(alpha = .7) +
+  theme_bw() +
+  scale_notification_status +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(top_zones_recent_onset ~ .) +
+  custom_vert_facet +
+  theme(legend.position = "bottom") +
+   labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar statut à la notification à la date de", " ", 
+                      format(database_date, "%d/%m/%Y")),
+        y = "Nombre de nouveaux cas par semaine",
+        x = "") +
+  custom_vert_facet +
+  scale_months
+
+```
+
+
+
+### Table: weekly case counts by report and status at notification
+
+```{r table_onset_notification_status}
+
+table_onset_notification_status <- i_onset_notification_status %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_onset_notification_status %>%
+  show_table(params = params)
+
+```
+
+
+
+<!-- ====================================================== -->
+## By contact status
+
+### Figure: epicurve by onset and contact status
+
+```{r figure_onset_contact_status, fig.width = 10}
+
+i_onset_contact_status <- incidence(x$date_onset, 7, groups = x$contact_status)
+
+plot(i_onset_contact_status, border = "white") +
+  theme_bw() +
+  scale_contact_status +
+  rotate_x_text(45) +
+  large_txt +
+  theme(legend.title = element_blank(),
+        legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(
+          fill = "transparent",
+          color = "white"
+        )) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar statut comme contact a la date du ", format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+
+### Figure: epicurve by onset and contact status (variant)
+
+This repeats the previous figure by major recent health zones
+
+```{r figure_onset_contact_status_variant, fig.width = 10, fig.height = 8}
+
+x %>% filter(top_zones_recent_onset != "other") %>% 
+ggplot(aes(x = epiweek_onset_label, fill = contact_status)) +
+  geom_bar(alpha = .7) +
+  theme_bw() +
+  scale_contact_status +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(top_zones_recent_onset ~ .) +
+  custom_vert_facet +
+  theme(legend.position = "bottom") +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar statut comme contact a la date du ", format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine",
+       x = "") +
+  scale_months
+
+```
+
+
+
+
+### Table: weekly case counts by onset and contact status
+
+```{r table_onset_contact_status}
+
+table_onset_contact_status <- i_onset_contact_status %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_onset_contact_status %>%
+  show_table(params = params)
+
+```
+
+
+
+
+<!-- ====================================================== -->
+## By Community death status
+
+### Figure: epicurve by onset and community death status
+
+```{r figure_onset_community_death, fig.width = 10}
+
+i_onset_community_death <- incidence(x$date_onset, 7, 
+                                      groups = x$community_death)
+
+plot(i_onset_community_death, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  scale_community_death +
+  large_txt +
+  theme(legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar statut décès communautaire", " à la date du ", 
+                      format(as.Date(database_date), "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+
+
+### Figure: epicurve by onset and community death status (variant)
+
+This repeats the previous figure by major recent health zones
+
+```{r figure_onset_community_death_variant, fig.width = 10, fig.height = 8}
+
+x %>% filter(top_zones_recent_onset != "other") %>% 
+ggplot(aes(x = epiweek_onset_label, fill = community_death)) +
+  geom_bar(alpha = .7) +
+  theme_bw() +
+  scale_community_death +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(top_zones_recent_onset ~ .) +
+  custom_vert_facet +
+  theme(legend.position = "bottom") +
+   labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar statut décès communautaire", " à la date du ", 
+                      format(as.Date(database_date), "%d/%m/%Y")),
+        y = "Nombre de nouveaux cas par semaine",
+        x = "") +
+  scale_months
+
+```
+
+
+
+
+### Table: weekly case counts by onset and community death status
+
+```{r table_onset_community_death}
+
+table_onset_community_death <- i_onset_community_death %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_onset_community_death %>%
+  show_table(params = params)
+
+```
+
+
+
+
+<!-- ====================================================== -->
+## By vaccination status
+
+### Figure: weekly case counts by onset date and vaccination status
+
+```{r figure_onset_vaccination, fig.width = 10}
+
+i_onset_vaccination <- incidence(x$date_onset, 7, groups = factor(x$vacc))
+
+plot(i_onset_vaccination, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  scale_vaccination +
+  theme(legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+  large_txt + 
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar statut vaccinale a la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+
+
+### Figure: weekly case counts by onset date and vaccination status (variant)
+
+This repeats the previous figure by major recent health zones
+
+```{r figure_onset_vaccination_variant, fig.width = 10, fig.height = 8}
+
+x %>% filter(top_zones_recent_onset != "other") %>% 
+ggplot(aes(x = epiweek_onset_label, fill = vacc)) +
+  geom_bar(alpha = .7) +
+  theme_bw() +
+  scale_vaccination +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(top_zones_recent_onset ~ .) +
+  custom_vert_facet +
+  theme(legend.position = "bottom") +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar statut vaccinale a la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine",
+       x = "") +
+  scale_months
+
+```
+
+
+
+### Table: weekly case counts by onset and vaccination status
+
+```{r table_onset_vaccination_status}
+
+table_onset_vaccination_status <- i_onset_vaccination %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_onset_vaccination_status %>%
+  show_table(params = params)
+
+```
+
+
+
+
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+
+# Analyses by dates of report {.tabset .tabset-fade .tabset-pills}
+
+
+## Outline
+
+This section produces various *epicurves*, i.e. plots of case counts by time
+intervals and for various stratifications.
+
+
+## By epicasedef
+
+### Figure: epicurve by report and epicasedef
+
+```{r figure_report_epicasedef, fig.width = 10}
+
+i_report_epicasedef <- incidence(x$date_report, 7, groups = x$epicasedef)
+
+plot(i_report_epicasedef, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  scale_fill_discrete(name = "Statut du cas",
+                      breaks = c("confirmed", "probable"),
+                      labels = c("Confirmé","Probable")) +
+  large_txt +
+  theme(legend.title = element_blank(),
+        legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+
+```
+
+
+### Table: weekly case counts by report and epicasedef
+
+```{r table_report_epicasedef}
+
+table_report_epicasedef <- i_report_epicasedef %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_epicasedef %>%
+  show_table(params = params)
+
+```
+
+
+
+<!-- ====================================================== -->
+## By sub-coordination
+
+### Figure: epicurve by report and sub-coordination
+
+```{r figure_report_sous_coordination, fig.width = 10}
+
+i_report_sous_coordination <- incidence(x$date_report, 7,
+                                       groups = x$sous_coordination)
+
+plot(i_report_sous_coordination, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  guides(fill = guide_legend(ncol = 4)) +
+  large_txt +
+  theme(legend.title = element_blank(),
+        legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+  scale_sous_coordination +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+
+### Figure: epicurve by report and sub-coordination (variant)
+
+```{r figure_report_sous_coordination_variant, fig.width = 10, fig.height = 8}
+
+plot(i_report_sous_coordination, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  guides(fill = FALSE) +
+  large_txt +
+  scale_sous_coordination +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  facet_grid(groups ~ .) +
+  custom_vert_facet +
+  theme(strip.text.y = element_text(size = 12, angle = 0)) +
+  scale_months
+
+```
+
+### Table: weekly case counts by report and sous_coordination
+
+```{r table_report_sous_coordination}
+
+table_report_sous_coordination <- i_report_sous_coordination %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_sous_coordination %>%
+  show_table(params = params)
+
+```
+
+
+
+## By health zones
+
+### Table: weekly case counts by report and health zone
+
+```{r table_report_zone_de_sante}
+
+i_report_zone_de_sante <- incidence(x$date_report, 7,
+                                   groups = x$zone_de_sante)
+i_report_zone_de_sante
+
+table_report_zone_de_sante <- i_report_zone_de_sante %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_zone_de_sante %>%
+  show_table(params = params)
+
+```
+
+
+
+<!-- ====================================================== -->
+## By major health zone
+
+Major health zones are defined as the health zones with the highest case counts.
+
+### Figure: weekly case counts by major zone
+
+```{r figure_report_top_zones, fig.width = 10}
+
+i_report_top_zones <- incidence(x$date_report, 7, groups = x$top_zones)
+
+plot(i_report_top_zones, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  guides(fill = guide_legend(ncol = 4)) +
+  theme(legend.title = element_blank(),
+        legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(
+            fill = "transparent",
+            color = "white")) +
+  scale_fill_discrete() +
+  large_txt + 
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+
+### Figure: weekly case counts by major zone (variant)
+
+```{r figure_report_top_zones_variant, fig.width = 10, fig.height = 8}
+
+df_report_top_zones <- as.data.frame(i_report_top_zones, long = TRUE) 
+
+ggplot(df_report_top_zones,
+       aes(x = dates, y = counts, fill = groups)) +
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  rotate_x_text(45) +
+  large_txt +
+  scale_fill_discrete(guide = FALSE) +
+  theme(legend.position = "bottom") +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       x = "",
+       y = "Nombre de nouveaux cas par semaine") +
+  facet_grid(groups ~ .) +
+  custom_vert_facet +
+  scale_months
+
+```
+
+
+
+<!-- ====================================================== -->
+## By major health zone - past 21 days 
+
+Major health zones in this analyasis are defined as the health zones with the
+highest case counts in the past 21 days
+
+### Figure: weekly case counts by major zone - reported in past 21 days
+
+```{r figure_report_top_zones_21_days, fig.width = 10}
+
+i_report_top_zones_21_days <- incidence(x$date_report, 7, 
+                                       groups = x$top_zones_recent_report)
+
+plot(i_report_top_zones_21_days, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  guides(fill = guide_legend(ncol = 4)) +
+  theme(legend.title = element_blank(),
+        legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(
+            fill = "transparent",
+            color = "white"
+        )) +
+  scale_fill_discrete() +
+  large_txt + 
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+### Figure: Past 21 days weekly case counts by major zone, same y-axis (variant)
+
+```{r figure_report_top_zones_variant_21_days_same_axes, fig.width = 10, fig.height = 8}
+
+df_report_top_zones <- as.data.frame(i_report_top_zones_21_days, long = TRUE) 
+df_report_top_zones <- df_report_top_zones %>%
+                            filter(groups != "other")
+
+ggplot(df_report_top_zones,
+       aes(x = dates, y = counts, fill = groups)) +
+  theme_bw() +
+  geom_bar(stat = "identity") +
+  facet_grid(groups ~ .) +
+  custom_vert_facet +
+  rotate_x_text(45) +
+  large_txt +
+  scale_fill_discrete(guide = FALSE) +
+  theme(legend.position = "bottom") +
+  scale_y_continuous(breaks = int_breaks) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       x = "",
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+
+### Figure: Past 21 days weekly case counts by major zone, free y-axis (variant)
+
+```{r figure_report_top_zones_variant_21_days, fig.width = 10, fig.height = 8}
+
+df_report_top_zones <- as.data.frame(i_report_top_zones_21_days, long = TRUE) 
+df_report_top_zones <- df_report_top_zones %>%
+                            filter(groups != "other")
+
+ggplot(df_report_top_zones,
+       aes(x = dates, y = counts, fill = groups)) +
+  theme_bw() +
+  geom_bar(stat = "identity") +
+  facet_grid(groups ~ .) +
+  custom_vert_facet +
+  rotate_x_text(45) +
+  large_txt +
+  theme(legend.position = "bottom") +
+  scale_y_continuous(breaks = pretty_breaks(n = 3)) +
+  scale_fill_discrete(guide = FALSE) +
+  scale_y_continuous(breaks = pretty_breaks(n = 3)) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar date de début de symptômes à la date de", " ", 
+                      format(database_date, "%d/%m/%Y")),
+       x = "",
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+
+
+### Table: weekly case counts by major health zone
+
+```{r table_report_top_zones}
+
+table_report_top_zones <- i_report_top_zones %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_top_zones %>%
+  show_table(params = params)
+
+```
+
+
+
+<!-- ====================================================== -->
+## By mode of transmission
+
+### Figure: epicurve by report and transmission_place
+
+```{r figure_report_nosocomial, fig.width = 10}
+
+i_report_nosocomial <- incidence(x$date_report, 7, 
+                                 groups = x$transmission_place_group)
+
+plot(i_report_nosocomial, border = "white") +
+  theme_bw() +
+  scale_hcf +
+  rotate_x_text(45) +
+  large_txt +
+  theme(legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+   labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar site de transmission à la date de", " ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+
+### Figure: epicurve by report and transmission_place (variant)
+
+This repeats the previous figure by major recent health zones
+
+```{r figure_report_nosocomial_variant, fig.width = 10, fig.height = 8}
+
+x %>% filter(top_zones_recent_report != "other") %>% 
+ggplot(aes(x = epiweek_report_label, fill = transmission_place_group)) +
+  geom_bar(alpha = .7) +
+  theme_bw() +
+  scale_hcf +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(top_zones_recent_report ~ .) +
+  custom_vert_facet +
+  theme(legend.position = "bottom") +
+   labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar site de transmission à la date de", " ", 
+                      format(database_date, "%d/%m/%Y")),
+        y = "Nombre de nouveaux cas par semaine",
+        x = "") +
+  scale_months
+
+```
+
+
+
+### Table: weekly case counts by report and transmission place
+
+```{r table_report_nosocomial_report}
+
+table_report_nosocomial <- i_report_nosocomial %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_nosocomial %>%
+  show_table(params = params)
+
+```
+
+
+
+
+<!-- ====================================================== -->
+## By status at notification
+
+### Figure: epicurve by report and status at notification
+
+```{r figure_report_notification_status, fig.width = 10}
+
+i_report_notification_status <- incidence(x$date_report, 7, groups = factor(x$report_status))
+
+plot(i_report_notification_status, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  scale_notification_status +
+  large_txt +
+  theme(legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(
+          fill = "transparent",
+          color = "white")) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar statut à la notification à la date de", " ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+
+```
+
+
+
+### Figure: epicurve by report and status at notification (variant)
+
+This repeats the previous figure by major recent health zones
+
+```{r figure_report_notification_status_variant, fig.width = 10, fig.height = 8}
+
+x %>% filter(top_zones_recent_report != "other") %>% 
+ggplot(aes(x = epiweek_report_label, fill = report_status)) +
+  geom_bar(alpha = .7) +
+  theme_bw() +
+  scale_notification_status +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(top_zones_recent_report ~ .) +
+  theme(legend.position = "bottom") +
+   labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar statut à la notification à la date de", " ", 
+                      format(database_date, "%d/%m/%Y")),
+        y = "Nombre de nouveaux cas par semaine",
+        x = "") +
+  custom_vert_facet +
+  scale_months
+
+```
+
+
+
+### Table: weekly case counts by report and status at notification
+
+```{r table_report_notification_status_report}
+
+table_report_notification_status <- i_report_notification_status %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_notification_status %>%
+  show_table(params = params)
+
+```
+
+
+
+<!-- ====================================================== -->
+## By contact status
+
+### Figure: epicurve by report and contact status
+
+```{r figure_report_contact_status, fig.width = 10}
+
+i_report_contact_status <- incidence(x$date_report, 7, groups = x$contact_status)
+
+plot(i_report_contact_status, border = "white") +
+  theme_bw() +
+  scale_contact_status +
+  rotate_x_text(45) +
+  large_txt +
+  theme(legend.title = element_blank(),
+        legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(
+          fill = "transparent",
+          color = "white"
+        )) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar statut comme contact a la date du ", format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+
+### Figure: epicurve by report and contact status (variant)
+
+This repeats the previous figure by major recent health zones
+
+```{r figure_report_contact_status_variant, fig.width = 10, fig.height = 8}
+
+x %>% filter(top_zones_recent_report != "other") %>% 
+ggplot(aes(x = epiweek_report_label, fill = contact_status)) +
+  geom_bar(alpha = .7) +
+  theme_bw() +
+  scale_contact_status +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(top_zones_recent_report ~ .) +
+  custom_vert_facet +
+  theme(legend.position = "bottom") +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar statut comme contact a la date du ", format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine",
+       x = "") +
+  scale_months
+
+```
+
+
+
+
+### Table: weekly case counts by report and contact status
+
+```{r table_report_contact_status}
+
+table_report_contact_status <- i_report_contact_status %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_contact_status %>%
+  show_table(params = params)
+
+```
+
+
+
+
+<!-- ====================================================== -->
+## By Community death status
+
+### Figure: epicurve by report and community death status
+
+```{r figure_report_community_death, fig.width = 10}
+
+i_report_community_death <- incidence(x$date_report, 7, 
+                                      groups = x$community_death)
+
+plot(i_report_community_death, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  scale_community_death +
+  large_txt +
+  theme(legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar statut décès communautaire", " à la date du ", 
+                      format(as.Date(database_date), "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+
+
+### Figure: epicurve by report and community death status (variant)
+
+This repeats the previous figure by major recent health zones
+
+```{r figure_report_community_death_variant, fig.width = 10, fig.height = 8}
+
+x %>% filter(top_zones_recent_report != "other") %>% 
+ggplot(aes(x = epiweek_report_label, fill = community_death)) +
+  geom_bar(alpha = .7) +
+  theme_bw() +
+  scale_community_death +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(top_zones_recent_report ~ .) +
+  custom_vert_facet +
+  theme(legend.position = "bottom") +
+   labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar statut décès communautaire", " à la date du ", 
+                      format(as.Date(database_date), "%d/%m/%Y")),
+        y = "Nombre de nouveaux cas par semaine",
+        x = "") +
+  scale_months
+
+```
+
+
+
+
+### Table: weekly case counts by report and community death status
+
+```{r table_report_community_death}
+
+table_report_community_death <- i_report_community_death %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_community_death %>%
+  show_table(params = params)
+
+```
+
+
+
+
+<!-- ====================================================== -->
+## By vaccination status
+
+### Figure: weekly case counts by report date and vaccination status
+
+```{r figure_report_vaccination, fig.width = 10}
+
+i_report_vaccination <- incidence(x$date_report, 7, groups = factor(x$vacc))
+
+plot(i_report_vaccination, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  scale_vaccination +
+  theme(legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+  large_txt + 
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar statut vaccinale a la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+
+
+### Figure: weekly case counts by report date and vaccination status (variant)
+
+This repeats the previous figure by major recent health zones
+
+```{r figure_report_vaccination_variant, fig.width = 10, fig.height = 8}
+
+x %>% filter(top_zones_recent_report != "other") %>% 
+ggplot(aes(x = epiweek_report_label, fill = vacc)) +
+  geom_bar(alpha = .7) +
+  theme_bw() +
+  scale_vaccination +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(top_zones_recent_report ~ .) +
+  custom_vert_facet +
+  theme(legend.position = "bottom") +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar statut vaccinale a la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine",
+       x = "") +
+  scale_months
+
+```
+
+
+
+### Table: weekly case counts by report and vaccination status
+
+```{r table_report_vaccination_status}
+
+table_report_vaccination_status <- i_report_vaccination %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_vaccination_status %>%
+  show_table(params = params)
+
+```
+
+
+
+
+
+
+
+
+
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+
+# Export tables {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+We export the various tables produced in this report to excel files saved in a
+folder `produced_xlsx`.
+
+## Excel files
+
+```{r exports}
+
+if (!dir.exists("produced_xlsx")) {
+  dir.create("produced_xlsx")
+}
+
+
+## list all tables, and loop over export
+tables_to_export <- c("table_epicasedef_outcome",
+                      "table_epicasedef_sous_coordination",
+                      "table_cases_zones",
+                      "table_onset_epicasedef",
+                      "table_onset_sous_coordination",
+                      "table_onset_zone_de_sante",
+                      "table_onset_top_zones_weekly",
+                      "table_onset_top_zones_weekly",
+                      "table_onset_nosocomial",
+                      "table_onset_notification_status",
+                      "table_onset_contact_status",
+                      "table_onset_community_death",
+                      "table_onset_vaccination_status",
+                      "table_report_epicasedef",
+                      "table_report_sous_coordination",
+                      "table_report_zone_de_sante",
+                      "table_report_top_zones",
+                      "table_report_nosocomial",
+                      "table_report_notification_status",
+                      "table_report_contact_status",
+                      "table_report_community_death",
+                      "table_report_vaccination_status")
+
+for (e in tables_to_export) {
+  rio::export(get(e),
+              file.path("produced_xlsx",
+                        paste0(e, ".xlsx")))
+}
+
+```
+
+Click on the following links to open the files (only works if the files above
+have been generated and are in the same folder as this document):
+
+
+**General tables**
+
+- [table_epicasedef_outcome.xlsx](produced_xlsx/table_epicasedef_outcome.xlsx)
+- [table_epicasedef_sous_coordination.xlsx](produced_xlsx/table_epicasedef_sous_coordination.xlsx)
+- [table_cases_zones.xlsx](produced_xlsx/table_cases_zones.xlsx)
+
+
+**By dates of onset**
+
+- [table_onset_epicasedef.xlsx](produced_xlsx/table_onset_epicasedef.xlsx)
+- [table_onset_sous_coordination.xlsx](produced_xlsx/table_onset_sous_coordination.xlsx)
+- [table_onset_zone_de_sante.xlsx](produced_xlsx/table_onset_zone_de_sante.xlsx)
+- [table_onset_top_zones.xlsx](produced_xlsx/table_onset_top_zones.xlsx)
+- [table_onset_nosocomial.xlsx](produced_xlsx/table_onset_nosocomial.xlsx)
+- [table_onset_notification_status.xlsx](produced_xlsx/table_onset_notification_status.xlsx)
+- [table_onset_contact_status.xlsx](produced_xlsx/table_onset_contact_status.xlsx)
+- [table_onset_community_death.xlsx](produced_xlsx/table_onset_community_death.xlsx)
+- [table_onset_vaccination_status.xlsx](produced_xlsx/table_onset_vaccination_status.xlsx)
+
+
+**By dates of reporting**
+
+- [table_report_epicasedef.xlsx](produced_xlsx/table_report_epicasedef.xlsx)
+- [table_report_sous_coordination.xlsx](produced_xlsx/table_report_sous_coordination.xlsx)
+- [table_report_zone_de_sante.xlsx](produced_xlsx/table_report_zone_de_sante.xlsx)
+- [table_report_top_zones.xlsx](produced_xlsx/table_report_top_zones.xlsx)
+- [table_report_nosocomial.xlsx](produced_xlsx/table_report_nosocomial.xlsx)
+- [table_report_notification_status.xlsx](produced_xlsx/table_report_notification_status.xlsx)
+- [table_report_contact_status.xlsx](produced_xlsx/table_report_contact_status.xlsx)
+- [table_report_community_death.xlsx](produced_xlsx/table_report_community_death.xlsx)
+- [table_report_vaccination_status.xlsx](produced_xlsx/table_report_vaccination_status.xlsx)
+
+
+
+
+
+
+
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+
+# System information {.tabset .tabset-fade .tabset-pills}
+
+The following information documents the system on which the document was
+compiled.
+
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+R.version
+```
+
+
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+sessionInfo()
+```
+
+
+### Change log:
+
+#### Version 2.1.0
+
+* added new variable names
+* set color scale for zone de sante across document
+* fixed spelling mistakes
+* changed table and figure names as appropriate ("last 21 days" to "recent onset")
+* added figures and tables for top recent onset ZS, daily for the last 3 months
+* exported new table
+
+### To do: 
+* check use of epiweek_onset_label (lolwa?)
+* rename variables (last_21_days)
+* describe 21 (or other timeframe) days more clearly in text
+* add table and fig for "top ZS recent report" data
+* decide on "recent" timeframe
+* decide on plot timeline in days for daily plots (63 days?)
+* review with Thibaut
+* decide maintainer

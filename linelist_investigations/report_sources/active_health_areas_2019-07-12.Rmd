@@ -1,0 +1,364 @@
+---
+title: "Incidence by aire de santé"
+author: "Madeleine Crowe, Flavio Finger, Thibaut Jombart, and Jonathan Polonsky for the epi analytic cell North Kivu"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document:
+    toc: TRUE
+    toc_depth: 4
+    toc_float: true
+    toc_collapse: false
+    number_sections: true
+    highlight: pygments
+    theme: spacelab
+    code_folding: hide
+    css: !expr here::here('css', 'style.css')
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      collapse = TRUE,
+                      fig.width = 8,
+                      fig.height = 6,
+                      dpi = 150,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+
+
+<!-- ================================= -->
+<!-- ================================= -->
+<!-- ================================= -->
+
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This is the universal cleaning script for master linelist database.
+
+### Data used
+
+Input data is the master linelist with one row per case. 
+**All input files must be `xlsx` files.**
+
+### Method
+
+The data preparation involves the following steps, detailed in the following tabs:
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded; scripts include the data-cleaning dictionary and the paths to the
+  current data
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc.
+
+
+## Load scripts
+
+These scripts will load:
+
+* required packages
+* a few helper functions
+* a data-cleaning dictionary (`cleaning_rules`)
+* the path to current version of raw data (`current_data`)
+
+```{r read_scripts}
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$", full.names = TRUE)
+for (file in scripts_files) source(file)
+
+
+ggthemr("pale")
+```
+
+
+
+## Load data
+
+```{r load_data}
+
+current_clean_data
+x <- rio::import(current_clean_data)
+
+file_name <- gsub("^[^.]+/", "", current_clean_data)
+database_date <- file_name %>%
+  guess_dates()
+database_date
+
+```
+
+The **completion date** of the database is **`r format(database_date, format =
+"%A %d %b %Y")`**.
+
+
+## Subsetting cases
+
+We subset data to retain only confirmed and probable cases.
+
+```{r subset cases}
+
+x <- x %>%
+  filter(epicasedef %in% c("confirmed", "probable"))
+
+```
+
+## Matching between health area and sub-coordination
+
+The correspondance between health areas and sub-coordination will be needed recover the sub-coordinations information after stratifying by health areas. We define the matching based on the most frequent correspondence between health areas and sub-coordinations.
+
+
+```{r health area sub coord}
+
+aire_de_sante_info <- x %>% 
+  group_by(aire_de_sante, sous_coordination) %>% 
+  count() %>% 
+  group_by(aire_de_sante) %>% 
+  top_n(1, n) %>%
+  select(-n)
+
+aire_de_sante_info %>%
+  show_table()
+
+```
+
+<!-- ================================= -->
+<!-- ================================= -->
+<!-- ================================= -->
+
+# Analyses {.tabset .tabset-fade .tabset-pills}
+
+## Computer incidence by health area
+
+Daily incidence is computed for health areas using `incidence`, and will later be converted to a `data.frame` for further analyses:
+
+```{r incidence by health area}
+
+inc <- with(x, incidence(date_report, groups = aire_de_sante))
+
+```
+
+
+## Active health areas per day
+
+Here we compute the number of active health areas per day, for the entire time period of the data. Active areas are defined as health areas with at least 1 case within the last 21 days of the date considered. We do this by using the `rollsum` function, which computes the cumulative number of cases/aire de sante for a given time window (here, 21 days). Note that the argument `align = "right"` specifies that the time window, on a given day, should be in the past, not in the future. The argument `fill = NA` is also (weirdly) needed for this to work.
+
+
+```{r active health areas}
+
+inc_df <- as.data.frame(inc, long = TRUE) %>% 
+  rename(aire_de_sante = groups) %>% 
+  left_join(aire_de_sante_info) 
+
+timewindow <- 21
+
+nb_as_active <- inc_df %>%
+  group_by(aire_de_sante) %>%
+  mutate(
+      cases_last_21_days =zoo::rollsum(counts,
+                                   timewindow,
+                                   align = "right",
+                                   fill = NA),
+    has_cases = (cases_last_21_days > 0)
+     ) %>%
+  group_by(dates, sous_coordination) %>% 
+  summarise(n_active_areas = sum(has_cases))
+ 
+
+ggplot(nb_as_active) +
+  geom_col(aes(x = dates, y = n_active_areas,
+               fill = sous_coordination),
+           width = 1) +
+  labs(title = "Nombre d'aires de santé actives au cours du temps",
+       x = "",
+       y = paste("Nombre d'aires de santé avec au moins un cas",
+                 "notifié dans les 21 derniers jours",
+                 sep = "\n")) +
+  scale_x_date(date_breaks = "1 month") +
+  theme(legend.position = c(0.25, 0.85)) +
+  scale_fill_discrete("Sous-coordination") +
+  guides(fill = guide_legend(ncol = 2)) +
+  large_txt +
+  rotate_x_text(45)
+
+```
+
+```{r number as active}
+nb_as_active %>% 
+  group_by(dates, sous_coordination) %>% 
+  summarise(n = sum(n_active_areas, na.rm = TRUE)) %>% 
+  filter(!is.na(n), !sous_coordination %in% "other_unknown") %>%
+  ggplot() +
+  aes(x = dates, y = n, fill = sous_coordination, width = 1) +
+  geom_col() +
+  labs(
+    title = "Nombre d'aires de santé actives au cours du temps",
+    x = "",
+    y = 
+      paste(
+        "Nombre d'aires de santé avec au moins un cas",
+        "notifié dans les 21 derniers jours",
+        sep = "\n"
+      )
+  ) +
+  scale_x_date(date_breaks = "2 month") +
+  theme(legend.position = "none") +
+  scale_fill_discrete("Sous-coordination") +
+  guides(fill = guide_legend(ncol = 2)) +
+  large_txt +
+  rotate_x_text(45) +
+  # theme(axis.text.x = element_text(size = 6, angle = 90, hjust = .5)) +
+  facet_wrap(~ sous_coordination)
+```
+
+```{r as active table}
+nb_as_active %>%
+  show_table()
+
+```
+
+## Current active areas - 21 days
+In this part we identify health areas active on the date of completion of the database, and report the number of cases over the last 21 days, i.e. from the **`r database_date-21`** to the **`r database_date`**.
+
+
+```{r current active areas}
+
+current_active <- x %>%
+  group_by(aire_de_sante) %>%
+  summarise(n_cases_21_days = sum(date_report > (database_date - 20))) %>%
+  filter(n_cases_21_days > 0) %>% 
+  left_join(aire_de_sante_info)
+
+
+ggplot(current_active, aes(x = aire_de_sante, y = n_cases_21_days)) +
+  geom_col(aes(fill = sous_coordination)) +
+  facet_grid(. ~ sous_coordination,
+             scales = "free_x",
+             space = "free") +
+  custom_horiz_facet +
+  large_txt +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90,
+                                   vjust = 0.5,
+                                   hjust = 1,
+                                   size = 11)) +
+  scale_fill_discrete("") +
+  labs(title = sprintf("Aires de santé actives au %s",
+                       format(database_date, "%d %b %Y")),
+       x = "",
+       y = "Nombre de cas au cours des 21 derniers jours")
+
+```
+
+
+```{r current active table}
+
+current_active %>%
+  show_table()
+
+```
+
+## Current active areas - 7 days
+In this part we identify health areas active on the date of completion of the database, and report the number of cases over the last 7 days, i.e. from the **`r database_date-7`** to the **`r database_date`**.
+
+```{r current active areas past 7 days}
+
+current_active_7_days <- x %>%
+  group_by(aire_de_sante) %>%
+  summarise(n_cases_7_days = sum(date_report > (database_date - 7))) %>%
+  filter(n_cases_7_days > 0) %>% 
+  left_join(aire_de_sante_info)
+
+
+ggplot(current_active_7_days, aes(x = aire_de_sante, y = n_cases_7_days)) +
+  geom_col(aes(fill = sous_coordination)) +
+  facet_grid(. ~ sous_coordination,
+             scales = "free_x",
+             space = "free") +
+  custom_horiz_facet +
+  large_txt +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90,
+                                   vjust = 0.5,
+                                   hjust = 1,
+                                   size = 11)) +
+  scale_fill_discrete("") +
+  labs(title = sprintf("Aires de santé actives au %s",
+                       format(database_date, "%d %b %Y")),
+       x = "",
+       y = "Nombre de cas au cours des 7 derniers jours")
+```
+
+
+```{r current active table 7 days}
+
+current_active_7_days %>%
+  show_table()
+
+```
+
+
+```
+
+
+# Export data 
+
+We export some of the relevant tables, which will be placed in the current working directory:
+
+```{r export_xlsx}
+
+if (!dir.exists("produced_xlsx")) {
+  dir.create("produced_xlsx")
+}
+
+rio::export(inc_df,
+            file.path("produced_xlsx",
+                      "incidence_data_frame.xlsx"))
+
+rio::export(nb_as_active,
+            file.path("produced_xlsx",
+                      "active_health_areas_21_days.xlsx"))
+
+rio::export(current_active,
+            file.path("produced_xlsx",
+                      "current_active_health_areas.xlsx"))
+
+```
+
+
+
+
+# System information {.tabset .tabset-fade .tabset-pills}
+
+The following information documents the system on which the document was
+compiled.
+
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+R.version
+```
+
+
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+sessionInfo()
+```

@@ -1,0 +1,657 @@
+---
+title: "Key performance indicators for the DG weekly brief"
+author: "Jonathan Polonsky, Patrick Keating, Thibaut Jombart for the epi analysis cell - EOC Goma"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document:
+    toc: TRUE
+    toc_depth: 4
+    toc_float: true
+    toc_collapse: false
+    number_sections: true
+    highlight: pygments
+    theme: spacelab
+    code_folding: hide
+    css: !expr here::here('css', 'style.css')
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  collapse = TRUE,
+  fig.width = 8,
+  fig.height = 6,
+  dpi = 150,
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This report prepares a table of KPIs for the DG weekly brief
+
+### Data used
+
+The master linelist.
+
+### Method
+
+The data preparation involves the following steps, detailed in the following tabs:
+
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc.
+
+* **Clean data**: this section contains *ad hoc* data cleaning, i.e. which is
+  not used in other reports (otherwise cleaning should be done in a dedicated
+  report); this section is also used to create new variables used in the
+  analyses
+
+
+
+
+## Load scripts
+
+These scripts will load:
+
+* all local scripts, stored as `.R` filesinside `/scripts/`
+* all global scripts, i.e. stored outside the factory in `../scripts/`
+* the path to the cleaned VHF data stored as `x`
+
+```{r read_scripts}
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$", full.names = TRUE)
+for (file in scripts_files) source(file)
+
+```
+
+
+## Load data
+
+We extract the completion date from the file name:
+
+```{r load_data}
+
+## load the data
+current_clean_data
+x <- rio::import(current_clean_data)
+
+## extract database date from the file name
+database_date <- current_clean_data %>% 
+  guess_dates()
+
+database_date
+
+```
+
+The **completion date** of the database is **`r format(database_date, format =
+"%A %d %b %Y")`**.
+
+## Clean data
+
+Some optional data cleaning here, including the possible addition of new
+variables used in the analyses.
+
+### Data preparation
+
+We filter the data to include only the most recent 6 complete epiweeks of data,
+using dynamically created variables based on the database date.
+
+We also add a new variable `top_zones` which retains the top 6 health zones (with
+most cases since the beginning of the outbreak), and pool everything else into
+'others':
+
+
+```{r prep}
+
+recent_week <- 
+  ifelse(
+    weekdays(database_date) %in% "Sunday", 
+    aweek::date2week(database_date, floor_day = TRUE), 
+    aweek::date2week(database_date - 7, floor_day = TRUE)
+  )
+
+start_week <-
+  (aweek::week2date(recent_week) - (7 * 5)) %>% 
+  aweek::date2week(floor_day = TRUE) %>% 
+  as.character()
+
+df_kpi <-
+  x %>% filter(
+            epiweek_report >= start_week,
+            epiweek_report <= recent_week) %>% 
+  mutate(top_zones = top_values(zone_de_sante, 6),
+         registered_surveilled = 
+           contact_registered == "yes" &
+           contact_surveilled == "yes",
+         delay_admission =
+           if_else(delay_admission < 0,
+                   NA_integer_,
+                   delay_admission)) %>% 
+  select(top_zones,
+         epiweek_report,
+         type_death,
+         registered_surveilled,
+         delay_admission)
+
+## TODO: check if this is relevant
+zs_order <- df_kpi$top_zones %>% levels()
+
+```
+
+## Functions
+
+Here we define some functions to be used in the analysis:
+
+```{r functions}
+
+make_case_counts_total <- function(dat, zs) {
+  
+  df_crossing <- 
+    df_kpi %>% 
+    expand(top_zones, epiweek_report) %>% 
+    filter(top_zones %in% zs)
+  
+  dat %>% 
+    count(epiweek_report) %>% 
+    right_join(df_crossing) %>% 
+    replace_na(list(n = 0)) %>% 
+    full_join(
+      dat %>% 
+        count() %>% 
+        mutate(epiweek_report = "Overall")
+    )
+  
+}
+
+make_case_counts_var <- function(dat, zs, col_var) {
+  
+  col_var <- enquo(col_var)
+  
+  df_crossing <- 
+    df_kpi %>% 
+    expand(top_zones, epiweek_report, !!col_var) %>% 
+    filter(top_zones %in% zs)
+  
+  dat %>%
+    count(epiweek_report, !!col_var) %>% 
+    right_join(df_crossing) %>% 
+    replace_na(list(n = 0)) %>% 
+    group_by(epiweek_report) %>% 
+    mutate(freq = (n / sum(n) * 100) %>% round(1)) %>% 
+    full_join(
+      dat %>% 
+        count(!!col_var) %>% 
+        mutate(freq = (n / sum(n) * 100) %>% round(1)) %>% 
+        mutate(epiweek_report = "Overall")
+    ) %>% 
+    filter(!!col_var %in% TRUE) %>% 
+    mutate(!!col_var := str_c(n, " (", freq, "%)")) %>% 
+    select(1:2)
+  
+}
+
+make_delay <- function(dat, zs) {
+  
+  df_crossing <- 
+    df_kpi %>% 
+    expand(top_zones, epiweek_report) %>% 
+    filter(top_zones %in% zs)
+  
+  dat %>% 
+    right_join(df_crossing) %>% 
+    replace_na(list(n = 0)) %>% 
+    group_by(epiweek_report) %>%
+    summarise(
+      delay_med = median(delay_admission, na.rm = TRUE), 
+      delay_low = quantile(delay_admission, probs = 0.25, na.rm = TRUE),
+      delay_upp = quantile(delay_admission, probs = 0.75, na.rm = TRUE)
+    ) %>% 
+    full_join(
+      dat %>% 
+        summarise(
+          delay_med = median(delay_admission, na.rm = TRUE), 
+          delay_low = quantile(delay_admission, probs = 0.25, na.rm = TRUE),
+          delay_upp = quantile(delay_admission, probs = 0.75, na.rm = TRUE)
+        ) %>% 
+        mutate(epiweek_report = "Overall")
+    ) %>% 
+    mutate(delay = str_c(delay_med, " [", delay_low, " - ", delay_upp, "]")) %>% 
+    select(-c(2:4))
+  
+}  
+
+show_kpi_tbl <- function(num) {
+  
+  tbl_kpi_trend[[num]] %>%
+    knitr::kable(
+      align = c("l", rep("r", 4)),
+      caption = names(tbl_kpi_trend)[num]
+    ) %>% 
+    kable_styling(bootstrap_options = c("striped", "hover", "responsive"), font_size = 14) %>% 
+    row_spec(nrow(tbl_kpi_trend[[num]]), bold = TRUE) %>% 
+    column_spec(1, bold = TRUE)
+  
+}
+
+```
+
+
+
+## Analyses
+
+Now we map these functions over a nested tibble to analyse the data by top zone: 
+
+```{r calculations}
+
+## df_kpi_nest <- 
+##   df_kpi %>% 
+##   group_by(top_zones) %>% 
+##   nest()
+
+## !! THIS CODE NO LONGER WORKS; COMPLAINS ABOUT TOP_ZONES USED AS GROUPING AND
+## !! CANNOT BE ALTERED
+## Renaming the variable triggers other errors. Code too obscure (no
+## documentation of the functions) to be fixed quickly. This needs an extensive
+## review.
+
+## tbl_case_counts <- 
+##   df_kpi_nest %>% 
+##   mutate(
+##     case_counts_total = pmap(list(data, top_zones), ~make_case_counts_total(.x, .y)),
+##     case_counts_comm_deaths =
+##       pmap(list(data, top_zones), ~make_case_counts_var(.x, .y, type_death)),
+##     case_counts_registered_surveilled =
+##       pmap(list(data, top_zones), ~make_case_counts_var(.x, .y, registered_surveilled)),
+##     delay = pmap(list(data, top_zones), ~make_delay(.x, .y)))%>% #,
+## ## top_zones = top_zones %>% fct_relevel(zs_order)
+##   #) %>% 
+##   select(-data) %>%
+##   unnest %>% 
+##   select(-matches("[0-9]$")) %>% 
+##   set_names(
+##       c(#"Zone de santé",
+##         "Epiweek",
+##         "# Cases reported",
+##         "# Community deaths (%)",
+##         "% Cases from contact lists and under follow up at time of detection",
+##         "Median [IQR] days from onset to admission to ETC")
+##   )
+
+
+
+## !! This is a temporary patch. Need to overhaul the entire report.
+
+tbl_case_counts <- df_kpi %>% 
+  group_by(top_zones, epiweek_report) %>%
+  summarise(n_cases = n(),
+            n_comm_deaths = sum(type_death == "community"),
+            denom_comm_deaths = sum(type_death != "unknown"),
+            n_registered_surveilled = sum(registered_surveilled, na.rm = TRUE),
+            denom_registered_surveilled = sum(!is.na(registered_surveilled)),
+            median_delay_admission = median(delay_admission, na.rm = TRUE),
+            q25_delay_admission = quantile(delay_admission, .25, na.rm = TRUE),
+            q75_delay_admission = quantile(delay_admission, .75, na.rm = TRUE)
+            ) %>%
+  mutate("Zone de santé" = top_zones,
+         "Epiweek" = epiweek_report,
+         "# Cases reported" = n_cases,
+         "# Community deaths (%)" =
+           sprintf("%i (%.1f%%)",
+                   n_comm_deaths,
+                   prop_to_perc(n_comm_deaths / n_cases)), # to fix once the outcome data is fixed!!
+         "% Cases from contact lists and under follow up at time of detection" =
+           sprintf("%i (%.1f%%)",
+                   n_registered_surveilled,
+                   prop_to_perc(n_registered_surveilled / n_cases)), # to fix once denom fixed
+         "Median [IQR] days from onset to admission to ETC" =
+           sprintf("%.1f [%.1f-%.1f])",
+                   median_delay_admission,
+                   round(q25_delay_admission, 1),
+                   round(q75_delay_admission, 1)
+                   )
+         ) %>%
+  select("Zone de santé",
+         "Epiweek",
+         "# Cases reported",
+         "# Community deaths (%)",
+         "% Cases from contact lists and under follow up at time of detection",
+         "Median [IQR] days from onset to admission to ETC")
+
+
+```
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# KPIs for weekly DG brief
+## Outline 
+
+Here we present a summary of the epidemiological KPIs for the DG weekly brief
+
+
+## Snapshot of 6 most active health zones for epiweek `r recent_week`
+
+First we filter the data to provide a summary of the most recent 3 complete epiweeks.
+
+```{r overview_text}
+
+count_cases <- nrow(x)
+
+penultimate_epiweek_1 <- 
+  (recent_week %>% aweek::week2date() - 1) %>% 
+  aweek::date2week(floor_day = TRUE)
+
+penultimate_epiweek_2 <- 
+  (recent_week %>% aweek::week2date() - 8) %>% 
+  aweek::date2week(floor_day = TRUE)
+
+tbl_recent_cases <- 
+  x %>% 
+  filter(epiweek_report %in% c(recent_week, penultimate_epiweek_1, penultimate_epiweek_2)) %>% 
+  count(epiweek_report) %>% 
+  arrange(epiweek_report)
+
+recent_week_start <- recent_week %>% aweek::week2date() %>% format("%d %b %Y")
+recent_week_end <- (recent_week %>% aweek::week2date() + 6) %>% format("%d %b %Y")
+
+epiweek_sentence <- 
+  str_c(
+    "For the epiweek ", recent_week, " (", recent_week_start, " - ", recent_week_end, "):\n",
+    tbl_recent_cases$n[3], " cases were reported, compared to ", tbl_recent_cases$n[2], " cases in ", tbl_recent_cases$epiweek_report[2], ", and ", tbl_recent_cases$n[1], " cases in ", tbl_recent_cases$epiweek_report[1], "." 
+    )
+
+```
+
+
+```{r community deaths counts and health zone counts}
+
+comm_deathp <- x %>%
+  select(type_death, epiweek_report) %>% 
+  group_by_all() %>% 
+  tally() %>% 
+  spread(type_death, n, fill = 0) %>% 
+  adorn_totals("col") %>% 
+  mutate(prop_comm_death = prop_to_perc(community / Total))
+
+penultimate_cd <-
+  comm_deathp %>% 
+  filter(epiweek_report == penultimate_epiweek_1) %>% 
+  select(prop_comm_death) %>% 
+  round() %>% 
+  as.integer()
+
+week_before_penultimate_cd <-
+  comm_deathp %>% 
+  filter(epiweek_report == penultimate_epiweek_2) %>% 
+  select(prop_comm_death) %>% 
+  round() %>% 
+  as.integer()
+
+recent_week_cd <-
+  comm_deathp %>% 
+  filter(epiweek_report == recent_week) %>% 
+  select(prop_comm_death) %>% 
+  round() %>% 
+  as.integer()
+
+change <- 
+  if(penultimate_cd > recent_week_cd) {
+    print("decreased")
+  } else if(penultimate_cd == recent_week_cd){
+    print("remained the same")
+  }else{
+    print("increased")
+  }
+
+
+health_zones_counts <- 
+  x %>% 
+  select(zone_de_sante, epiweek_report) %>% 
+  mutate(zone_de_sante = str_to_title(zone_de_sante)) %>% 
+  group_by_all() %>% 
+  tally() %>% 
+  filter(epiweek_report %in% c(recent_week, penultimate_epiweek_1, penultimate_epiweek_2)) %>% 
+  spread(epiweek_report, n, fill = 0) %>%
+  adorn_totals("col") %>% 
+  arrange(desc(Total)) %>% 
+  mutate(total_cases_all_zs = sum(Total)) %>% 
+  mutate(prop = prop_to_perc(Total/total_cases_all_zs),
+         prop = round(prop),
+         prop = as.integer(prop)) 
+
+# health_zone_counts_21_days <-
+#   x %>%
+#   select(zone_de_sante, date_report) %>% 
+#   group_by_all() %>% 
+#   tally() %>%
+#   filter(date_report > (max(x$date_report) - 20)) %>%
+#   spread(date_report, n, fill = 0) %>%
+#   adorn_totals("col") %>%
+#   arrange(desc(Total)) %>%
+#   select(zone_de_sante, `2019-08-26`, `2019-08-27`, `2019-08-28`, `2019-08-29`, Total) %>%
+#   mutate(total_4_days = `2019-08-26` + `2019-08-27` + `2019-08-28` + `2019-08-29`)
+# 
+# sum(health_zone_counts_21_days$Total)
+# sum(health_zone_counts_21_days$total_4_days)
+
+x %>%
+  group_by(zone_de_sante) %>%
+  count() %>%
+  adorn_totals()
+
+```
+
+```{r active health areas in previous two weeks, include=FALSE}
+# Date of penultimate week
+penultimate_epiweek_1_date <- 
+  (recent_week %>% aweek::week2date() - 1)
+
+
+# Match health areas with subcoordination
+aire_de_sante_info <-
+  x %>% 
+  group_by(aire_de_sante, sous_coordination) %>% 
+  count() %>% 
+  group_by(aire_de_sante) %>% 
+  top_n(1, n) %>%
+  select(-n)
+
+
+# count active health areas in recent week (previous 21 days including the last week)
+current_active <- 
+  x %>%
+  group_by(aire_de_sante) %>%
+  summarise(n_cases_21_days = sum(date_report > (aweek::week2date(recent_week) - 17))) %>%
+  filter(n_cases_21_days > 0) %>% 
+  left_join(aire_de_sante_info)
+
+
+# count active health areas in previous week (21 days from the previous week)
+penultimate_week_active <- 
+  x %>%
+  group_by(aire_de_sante) %>%
+  filter(date_report < aweek::week2date(recent_week)) %>% 
+  summarise(n_cases_21_days = sum(date_report > (aweek::week2date(penultimate_epiweek_1_date) - 21))) %>%
+  filter(n_cases_21_days > 0) %>% 
+  left_join(aire_de_sante_info)
+
+
+## New health areas
+new_as <- current_active[!current_active$aire_de_sante %in% penultimate_week_active$aire_de_sante ,]
+
+new_as
+
+```
+
+
+```{r hcw}
+
+hcw_count <- 
+x %>% 
+  filter(epiweek_report %in% recent_week) %>% 
+  filter(hcw == "hcw") %>% 
+  tally()
+
+hcw_count
+
+# total HCW infections. 
+
+x %>% 
+  filter(hcw == "hcw") %>% 
+  tally()
+
+```
+
+
+  * As of `r format(database_date, "%d %b %Y")`, the total number of cases was `r nrow(x)`. 
+  * For the epidemiological week `r str_sub(max(x$epiweek_report),7)` `r paste0("(",format(database_date -6,"%d"), " - ", format(database_date, "%d %b"),")")`
+    * `r nrow(x[x$epiweek_report == recent_week, "epiweek_report"])` cases were reported compared to `r nrow(x[x$epiweek_report == penultimate_epiweek_1, "epiweek_report"])` in week `r str_sub(penultimate_epiweek_1, 7)`, and `r nrow(x[x$epiweek_report == penultimate_epiweek_2, "epiweek_report"])` in week `r str_sub(penultimate_epiweek_2, 7)`
+    * Total number of active health areas was `r nrow(current_active)` in week `r str_sub(max(x$epiweek_report),7)` compared to `r nrow(penultimate_week_active)` in week `r str_sub(penultimate_epiweek_1, 7)`
+      * There were a total of `r nrow(new_as)` new health areas in week `r str_sub(max(x$epiweek_report),7)`
+  * Proportion of community deaths `r change` from `r penultimate_cd `% week `r str_sub(penultimate_epiweek_1, 7)` to `r recent_week_cd`% week `r str_sub(recent_week, 7)`. For week `r str_sub(penultimate_epiweek_2, 7)`, the community death rate was `r week_before_penultimate_cd`%.
+  * There were a total of `r hcw_count` new infections among health care workers in week `r str_sub(max(x$epiweek_report),7)`
+  * During the last 3 weeks (as of `r format(database_date, "%d %b")`):
+    * `r health_zones_counts[1,1]` health zone (HZ) was the main hot spot with `r health_zones_counts[1,7]`%  (`r health_zones_counts[1,5]`/`r health_zones_counts[1,6]`) of total cases over the time period.  
+    * `r health_zones_counts[2,1]` HZ was the second hot spot with `r health_zones_counts[2,7]`% (`r health_zones_counts[2,5]`/`r health_zones_counts[2,6]`) of total cases over the time period.
+    * `r health_zones_counts[3,1]` HZ was the third hot spot with `r health_zones_counts[3,7]`% (`r health_zones_counts[3,5]`/`r health_zones_counts[3,6]`) of total cases over the time period.  
+
+```{r kpi_tbl_recent_week}
+
+df_kpi_latest <- df_kpi %>% filter(epiweek_report %in% recent_week)
+
+kpi_total_1 <- 
+  df_kpi_latest %>% 
+  count() %>% 
+  mutate(top_zones = "Overall") %>% 
+  select(top_zones, everything())
+
+kpi_total_2 <- 
+  df_kpi_latest %>% 
+  count(type_death) %>% 
+  mutate(freq = (n / sum(n) * 100) %>% round(1)) %>% 
+  mutate(top_zones = "Overall") %>% 
+  filter(type_death %in% TRUE) %>% 
+  mutate(type_death = str_c(n, " (", freq, "%)")) %>% 
+  select(top_zones, type_death)
+
+kpi_total_3 <- 
+  df_kpi_latest %>% 
+  count(registered_surveilled) %>% 
+  mutate(freq = (n / sum(n) * 100) %>% round(1)) %>% 
+  mutate(top_zones = "Overall") %>% 
+  filter(registered_surveilled %in% TRUE) %>% 
+  mutate(registered_surveilled = str_c(n, " (", freq, "%)")) %>% 
+  select(top_zones, registered_surveilled)
+
+kpi_total_4 <- 
+  df_kpi_latest %>% 
+  summarise(
+    delay_med = median(delay_admission, na.rm = TRUE), 
+    delay_low = quantile(delay_admission, probs = 0.25, na.rm = TRUE),
+    delay_upp = quantile(delay_admission, probs = 0.75, na.rm = TRUE)
+  ) %>% 
+  mutate(top_zones = "Overall") %>% 
+  mutate(delay = str_c(delay_med, " [", delay_low, " - ", delay_upp, "]")) %>% 
+  select(4:5)
+
+kpi_total_all <- 
+  kpi_total_1 %>% 
+  full_join(kpi_total_2) %>% 
+  full_join(kpi_total_3) %>% 
+  full_join(kpi_total_4) %>% 
+  add_column(epiweek = recent_week) %>% 
+  set_names(
+    c("Zone de santé", "# Cases reported", "# Community deaths (%)", "% Cases from contact lists and under follow up at time of detection", "Median [IQR] days from onset to admission to ETC", "Epiweek")
+  )
+
+tbl_kpi_latest <- 
+  tbl_case_counts %>% 
+  filter(Epiweek %in% recent_week) %>% 
+  bind_rows(kpi_total_all) %>% 
+  mutate(`Zone de santé` = `Zone de santé` %>% fct_relevel(c(zs_order, "Overall"))) %>% 
+  arrange(`Zone de santé`) %>% 
+  select(-Epiweek)
+
+tbl_kpi_latest %>% 
+  kable(align = c("l", rep("r", 4))) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"), font_size = 14) %>% 
+  footnote(
+    general = str_c("Data for epiweek ", recent_week),
+    title_format = c("bold")
+  ) %>% 
+  row_spec(nrow(tbl_kpi_latest), bold = TRUE) %>% 
+  column_spec(1, bold = TRUE)
+
+```
+
+## Trends for past 6 weeks in most active health zones
+
+```{r kpi_tbl_trend, results="asis"}
+
+tbl_kpi_trend <- 
+  tbl_case_counts %>% 
+  group_by(`Zone de santé`) %>% 
+  group_split(keep = FALSE) %>% 
+  set_names(zs_order)
+
+seq_along(tbl_kpi_trend) %>% walk(~ show_kpi_tbl(.x) %>% cat())
+
+```
+
+
+
+
+
+# System information {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+The following information documents the system on which the document was
+compiled.
+
+
+
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+R.version
+```
+
+
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+sessionInfo()
+```
