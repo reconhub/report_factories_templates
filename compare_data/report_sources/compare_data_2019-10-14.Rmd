@@ -320,15 +320,22 @@ default; for even better visualisation, we recommend going to the `tables/`
 folder and opening `comparison_duplicates_table.html` with **Excel** </font>
 
 ```{r comparison_duplicates, results = "asis"}
-  
-comparison_duplicates <- compareDF::compare_df(
-                                        duplicates_new,
-                                        duplicates_old,
-                                        group_col = "id",
-                                        limit_html = 1000,
-                                        color_scheme = comp_colors,
-                                        keep_unchanged_rows = TRUE,
-                                        stop_on_error = FALSE)
+
+duplicates_in_both <- as.logical(
+    nrow(duplicates_old) *
+    nrow(duplicates_new))
+
+if (duplicates_in_both) {
+
+  comparison_duplicates <- compareDF::compare_df(
+                                          duplicates_new,
+                                          duplicates_old,
+                                          group_col = "id",
+                                          limit_html = 1000,
+                                          color_scheme = comp_colors,
+                                          keep_unchanged_rows = TRUE,
+                                          stop_on_error = FALSE)
+}
 
 ```
 
@@ -401,6 +408,7 @@ if (!dir.exists("tables")) {
 ```
 
 
+
 <!-- ======================================================= -->
 ## Create output files
 
@@ -408,10 +416,12 @@ The following items are exported:
 
 ```{r exports}
 
-writeLines(comparison_duplicates$html_output,
-           con = file.path("tables",
-                           "comparison_duplicates_table.html"),
-    useBytes = TRUE)
+if (duplicates_in_both) {
+  writeLines(comparison_duplicates$html_output,
+             con = file.path("tables",
+                             "comparison_duplicates_table.html"),
+             useBytes = TRUE)
+}
 
 writeLines(comparison$html_output,
            con = file.path("tables",
