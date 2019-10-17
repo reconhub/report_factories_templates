@@ -1,1 +1,4 @@
-data*
+*~
+report_outputs
+.Rhistory
+*.Rproj
