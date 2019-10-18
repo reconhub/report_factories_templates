@@ -373,8 +373,14 @@ This section defines age classes - see code for details.
 ```{r clean_age}
 
 x <- x %>%
-  mutate(
-      age = as.numeric(gsub("_", ".", age)),
+  mutate(age = gsub("_", ".", age))
+
+# line below converts values that were initially in scientific notation (indicative of age < 1 year) to # prevent NA's from arising when calling "age = as.numeric(age)"
+  x$age[grep("E.",x$age)]=map_chr(.x=x$age[grep("E.",x$age)],.f=function(.x){return(as.character(as.numeric(substr(.x,1,regexpr("E.",.x)-1))*10^-as.numeric(substr(.x,regexpr("E.",.x)+2,nchar(.x)))))})
+  
+  x= x%>%
+      mutate(
+      age = as.numeric(age),
       age_class = factor(
           case_when(
               age <= 5 ~ "<=5",
