@@ -8,7 +8,7 @@ int_breaks <- function(x, n = 5) {
 ## make text bigger on ggplot2 plots
 large_txt <- ggplot2::theme(text = ggplot2::element_text(size = 16),
                             axis.text = ggplot2::element_text(size = 14))
-smaller_axis_txt <- ggplot2::theme(axis.text = ggplot2::element_text(size = 12))
+smaller_axis_txt <- ggplot2::theme(axis.text = ggplot2::element_text(size = 10))
 
 
 ## dark color palette
