@@ -175,6 +175,7 @@ x <- x %>%
          age_class != "unknown",
          month_report >= as.Date("2019-01-01"))
 
+
 ```
 
 
