@@ -165,13 +165,16 @@ We retain only entries:
 * corresponding to confirmed and probable cases
 * whose sex is known
 * whose age class is known
+* from 2019-01-01 to present
 
 ```{r filter}
 
 x <- x %>%
   filter(epicasedef %in% c("confirmed", "probable"),
          sex %in% c("male", "female"),
-         age_class != "unknown")
+         age_class != "unknown",
+         date_report >= as.Date("2019-01-01"))
+
 
 ```
 
@@ -262,6 +265,7 @@ ggplot(counts_sub_coordination,
   coord_flip() +
   scale_y_continuous(labels = abs) +
   large_txt +
+  smaller_axis_txt +
   facet_wrap(~ sous_coordination, scales = "free_x") +
   custom_vert_facet +
   labs(x = "",
@@ -300,6 +304,7 @@ ggplot(counts_top_zones,
   coord_flip() +
   scale_y_continuous(labels = abs) +
   large_txt +
+  smaller_axis_txt +
   facet_wrap(~ top_zones, scales = "free_x") +
   custom_vert_facet +
   labs(x = "",
@@ -320,24 +325,37 @@ tab_top_zones %>%
 <!-- ======================================================= -->
 ## By month
 
+```{r month_report}
 
+counts_month_report <- x %>% 
+  group_by(month_report, sex, age_class) %>%
+  count()
 
+ggplot(counts_month_report,
+       aes(x = age_class,
+           fill = sex)) +
+  geom_bar(stat = "identity",
+           size = 1,
+           aes(y = ifelse(sex == "female", n, -n))) +
+  theme_bw() +
+  scale_sex +
+  coord_flip() +
+  scale_y_continuous(labels = abs) +
+  large_txt +
+  smaller_axis_txt +
+  facet_wrap(~ month_report, scales = "free_x") +
+  custom_vert_facet +
+  labs(x = "",
+       y = "Nombre de cas",
+       title = "Distribution par âge des cas")
 
+tab_month_report <- counts_month_report %>% 
+  spread(key = "age_class", value = "n", fill = 0)
 
+tab_month_report %>%
+  show_table()
 
-<!-- ======================================================= -->
-## By month and sub-coordination
-
-
-
-
-
-<!-- ======================================================= -->
-## By month and recent major health zone
-
-
-
-
+```
 
 
 
@@ -359,13 +377,16 @@ Provide an outline of exported files.
 
 Explain what the exported files are using the following model:
 
-* `produced_xlsx/tab_overall.xlsx`: tab_overall contains the overall distributions of cases by sex.
+* `produced_xlsx/tab_overall.xlsx`: tab_overall contains the overall distributions of cases by age group and sex.
 
 * `produced_xlsx/tab_sub_coordination.xlsx`: tab_sub_coordination contains the overall distributions of 
-cases by sex and sous coordination.
+cases by age group, sex, and sous coordination.
 
-* `produced_xlsx/tab_top_zones.xlsx`: tab_top_zones contains the overall distributions of cases by sex 
-in health zones with the most cases during the last 42 days. 
+* `produced_xlsx/tab_top_zones.xlsx`: tab_top_zones contains the overall distributions of cases by age group and sex 
+in health zones with the most cases during the last 42 days.
+
+* `produced_xlsx/tab_month_report.xlsx`: tab_month_report contains the overall distributions of cases by 
+age group, sex, and month of report. 
 
 
 ```{r xlsx_exports}
@@ -379,48 +400,17 @@ rio::export(tab_sub_coordination,
     file.path("produced_xlsx", "tab_sub_coordination.xlsx"))
 rio::export(tab_top_zones,
     file.path("produced_xlsx", "tab_top_zones.xlsx"))
+rio::export(tab_month_report,
+    file.path("produced_xlsx", "tab_month_report.xlsx"))
 
 ```
 
-Click on the following links to open the files (only works if the files above
-have been generated and are in the same folder as this document):
+Click on the following links to open the files:
 
 - [tab_overal.xlsx](produced_xlsx/tab_overall.xlsx)
 - [tab_sub_coordination.xlsx](produced_xlsx/tab_sub_coordination.xlsx)
 - [tab_top_zones.xlsx](produced_xlsx/tab_top_zones.xlsx)
-
-
-
-<!-- ======================================================= -->
-## R objects
-
-Explain what the exported files are using the following model:
-
-
-* `produced_rds/tab_overall.rds`: tab_overall contains the overall distributions of cases by sex.
-
-* `produced_rds/tab_sub_coordination.rds`: tab_sub_coordination contains the overall distributions of 
-cases by sex and sous coordination. 
-
-* `produced_rds/tab_top_zones.rds`: tab_top_zones contains the overall distributions of cases by sex 
-in health zones with the most cases during the last 42 days. 
-
-
-```{r rds_exports}
-# 
-if (!dir.exists("produced_rds")) {
-  dir.create("produced_rds")
-}
-
-rio::export(tab_overall,
-            file.path("produced_rds", "tab_overall.rds"))
-rio::export(tab_sub_coordination,
-            file.path("produced_rds", "tab_sub_coordination.rds"))
-rio::export(tab_top_zones,
-            file.path("produced_rds", "tab_top_zones.rds"))
-
-```
-
+- [tab_month_report.xlsx](produced_xlsx/tab_month_report.xlsx)
 
 
 
