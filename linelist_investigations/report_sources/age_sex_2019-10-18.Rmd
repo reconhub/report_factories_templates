@@ -173,7 +173,7 @@ x <- x %>%
   filter(epicasedef %in% c("confirmed", "probable"),
          sex %in% c("male", "female"),
          age_class != "unknown",
-         month_report >= as.Date("2019-01-01"))
+         date_report >= as.Date("2019-01-01"))
 
 
 ```
@@ -402,52 +402,12 @@ rio::export(tab_month_report,
 
 ```
 
-Click on the following links to open the files (only works if the files above
-have been generated and are in the same folder as this document):
+Click on the following links to open the files:
 
 - [tab_overal.xlsx](produced_xlsx/tab_overall.xlsx)
 - [tab_sub_coordination.xlsx](produced_xlsx/tab_sub_coordination.xlsx)
 - [tab_top_zones.xlsx](produced_xlsx/tab_top_zones.xlsx)
 - [tab_month_report.xlsx](produced_xlsx/tab_month_report.xlsx)
-
-
-
-
-<!-- ======================================================= -->
-## R objects
-
-Explain what the exported files are using the following model:
-
-
-* `produced_rds/tab_overall.rds`: tab_overall contains the overall distributions of cases by age group and sex.
-
-* `produced_rds/tab_sub_coordination.rds`: tab_sub_coordination contains the overall distributions of 
-cases by age group, sex, and sous coordination. 
-
-* `produced_rds/tab_top_zones.rds`: tab_top_zones contains the overall distributions of cases by age group and sex 
-in health zones with the most cases during the last 42 days. 
-
-* `produced_rds/tab_month_report.rds`: tab_month_report contains the overall distributions of cases by 
-age group, sex, and month of report. 
-
-
-```{r rds_exports}
-# 
-if (!dir.exists("produced_rds")) {
-  dir.create("produced_rds")
-}
-
-rio::export(tab_overall,
-            file.path("produced_rds", "tab_overall.rds"))
-rio::export(tab_sub_coordination,
-            file.path("produced_rds", "tab_sub_coordination.rds"))
-rio::export(tab_top_zones,
-            file.path("produced_rds", "tab_top_zones.rds"))
-rio::export(tab_month_report,
-            file.path("produced_rds", "tab_month_report.rds"))
-
-```
-
 
 
 
