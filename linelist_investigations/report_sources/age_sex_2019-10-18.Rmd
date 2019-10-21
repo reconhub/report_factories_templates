@@ -265,6 +265,7 @@ ggplot(counts_sub_coordination,
   coord_flip() +
   scale_y_continuous(labels = abs) +
   large_txt +
+  smaller_axis_txt +
   facet_wrap(~ sous_coordination, scales = "free_x") +
   custom_vert_facet +
   labs(x = "",
@@ -303,6 +304,7 @@ ggplot(counts_top_zones,
   coord_flip() +
   scale_y_continuous(labels = abs) +
   large_txt +
+  smaller_axis_txt +
   facet_wrap(~ top_zones, scales = "free_x") +
   custom_vert_facet +
   labs(x = "",
@@ -340,6 +342,7 @@ ggplot(counts_month_report,
   coord_flip() +
   scale_y_continuous(labels = abs) +
   large_txt +
+  smaller_axis_txt +
   facet_wrap(~ month_report, scales = "free_x") +
   custom_vert_facet +
   labs(x = "",
