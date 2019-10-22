@@ -137,6 +137,14 @@ document they contributed to.
 
 ## How to contribute
 
+First, **make sure you have read the guidelines** for writing analysis reports,
+which you can download from <a
+href="https://github.com/reconhub/guides/raw/master/golden_rules.html.zip"
+download="golden_rules.html.zip" target="_blank">here</a>. To discuss or amend
+these guidelines, see the corresponding [project on
+github](https://github.com/reconhub/guides).
+
+
 We use the usual github workflow for contributions:
 
 1. **fork the project**, if you are not yet part of the development team; **otherwise,
