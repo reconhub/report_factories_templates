@@ -1,0 +1,819 @@
+---
+title: "Linelist data cleaning"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document:
+    toc: TRUE
+    toc_depth: 4
+    toc_float: true
+    toc_collapse: false
+    number_sections: true
+    highlight: pygments
+    theme: spacelab
+    code_folding: hide
+    css: !expr here::here('css', 'style.css')
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      collapse = TRUE,
+                      fig.width = 8,
+                      fig.height = 6,
+                      dpi = 150,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+
+<div class="report_meta">
+  <span class="notice">**Notice**: this is a **stable, routine report**. 
+  **Do not touch it unless it is broken.** To make a contribution, **carefully read 
+  the [README](../../../../../README.html) file**.</span>
+  
+  **Maintainer:** Thibaut Jombart (thibautjombart@gmail.com)
+  
+  **Code contributors:** Thibaut Jombart, Flavio Finger, Christopher Jarvis, Madeleine Crowe, Jonathan Polonsky, Charlie Whittaker and the rest of the epi analysis cell, EOC Goma
+  
+  **Data contributors:**
+  
+  **Version:** 2.0.0
+  
+  **Reviewed by:** Amy Gimma
+</div>
+
+
+<!-- ================================= -->
+<!-- ================================= -->
+<!-- ================================= -->
+
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This is the universal cleaning script for master linelist database.
+
+### Data used
+
+Input data is the master linelist with one row per case. 
+**All input files must be `xlsx` files.**
+
+### Method
+
+The data preparation involves the following steps, detailed in the following tabs:
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded; scripts include the data-cleaning dictionary and the paths to the
+  current data
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc.
+
+
+## Load scripts
+
+These scripts will load:
+
+* required packages
+* a few helper functions
+* a data-cleaning dictionary (`cleaning_rules`)
+* the path to current version of raw data (`current_data`)
+
+```{r read_scripts}
+
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$", full.names = TRUE)
+
+for (file in scripts_files) source(file)
+
+```
+
+
+
+## Load data
+
+```{r load_data}
+
+## record current date (time at which document is compiled)
+today <- as.Date(Sys.time())
+
+## get data file
+## use excel and then the file encoding should not be an issue
+
+current_data
+check_file(current_data)
+
+x_raw <- custom_import(current_data) %>%
+  clean_data(guess_dates = FALSE) %>%
+  as_tibble()
+
+dim(x_raw)
+
+```
+
+
+
+## Completion date
+
+We extract the completion date from the file name:
+
+```{r database_date}
+
+file_name <- extract_file_name(current_data)
+database_date <- file_name %>%
+  guess_dates()
+database_date
+
+```
+
+The **completion date** of the database is **`r format(database_date, format =
+"%A %d %b %Y")`**.
+
+
+
+<!-- ================================= -->
+<!-- ================================= -->
+<!-- ================================= -->
+
+# Data cleaning {.tabset .tabset-fade .tabset-pills}
+
+## Outline 
+
+The data cleaning in this script must provide the data needed for all Linelist-based
+reports. It involves the following steps:
+
+* **data standardisation** using `clean_data`, which set all data to lower case,
+  removes special characters, replaces non-ascii characters with their closest
+  ascii match
+  
+* defining new variables from existing ones (mostly renaming) 
+
+* cleaning dates
+
+* using a dictionary-based cleaning: rules are defined in
+  `../dictionary/cleaning_rules.xlsx`
+
+* defining other variables, e.g. age categories or health-care worker status
+
+
+
+## Aliases and variable renaming
+
+We create aliases for some of the variables we'll use later (we use multiple
+`mutate` to be able to track errors):
+
+```{r aliases}
+
+## data that would be good to add:
+##
+## - date_discharge from ETC
+
+x <- x_raw %>%
+  mutate(epicasedef = factor(statut,
+                             levels = c("confirmed", "probable"))) %>%
+  mutate(date_onset = onset_cnc) %>% 
+  mutate(date_report = reportdate_cnc) %>% 
+  mutate(date_admission = cte_date) %>%
+  mutate(date_death = deathdischargedate) %>% 
+  mutate(date_exposure_start = date_contact_confirmed_case1) %>% 
+  mutate(date_exposure_end = enddate1_contact_confirmed) %>%
+  mutate(date_vacc = vacc_date) %>%
+  mutate(current_status = final_outcome) %>%
+  mutate(report_status = statusreport_mdc) %>% 
+  mutate(outcome = final_outcome) %>% 
+  mutate(zone_de_sante = zs_calc) %>% 
+  mutate(aire_de_sante = health_area) %>%
+  mutate(age = age_cnc) %>%
+  mutate(gender = sex) %>% 
+  mutate(epiweek_report = aweek::date2week(date_report,
+                                           week_start = "Monday", 
+                                           floor_day = TRUE)) %>% 
+  mutate(epiweek_report_label = aweek::week2date(epiweek_report,
+                                                 week_start = "Monday")) %>% 
+  mutate(epiweek_onset = aweek::date2week(date_onset,
+                                          week_start = "Monday", 
+                                          floor_day = TRUE)) %>% 
+  mutate(epiweek_onset_label = aweek::week2date(epiweek_onset,
+                                                week_start = "Monday")) %>%
+  mutate(month_report = floor_date(date_report, unit = "month"),
+         month_onset = floor_date(date_onset, unit = "month")) %>% 
+  mutate(transmission_place_group = transmission_place) %>%
+  mutate(place_death_crude = place_of_death)
+
+```
+
+
+
+## Clean dates
+
+The date cleaning uses `guess_dates`, with some additional specifications of
+priorities of formats when they can be ambiguous. This operation is
+time-consuming.
+
+Note that all sorts of issues happen with dates imported from Google Spreadsheet
+or Excel. A sneaky one is that of dates represented as numbers but stored as
+characters, e.g. `"43026"`. The conversion to `numeric` and then to `Date`
+requires an origin, which differs in the native Excel format and a google
+spreadsheet, even if it has been saved by Excel:
+
+* Excel's origin is 1900-01-01 (for VHF)
+* google spreadsheet's origin is 1899-12-30 (for MLL)
+
+As the MLL comes from Google Spreadsheet, it will implicitely use the
+`1889-12-30` as origin. We pass it to our tweak of `guess_dates()`.
+
+```{r replace_dates}
+
+x <- x %>% 
+  mutate_at(
+      vars(starts_with("date_")),
+      guess_dates, origin = as.Date("1899-12-30"))
+
+
+```
+
+
+
+## Dictionary-based cleaning
+
+Please see cleaning rules in `../dictionary/cleaning_rules.xlsx`
+
+```{r dictionary_cleaning}
+
+x <- x %>%
+  clean_variable_spelling(wordlists = cleaning_rules) 
+
+x <- x %>% 
+  mutate(health_area = aire_de_sante)
+
+```
+
+## Define contact status
+
+``` {r contact status}
+
+x <- x %>%
+  mutate(contact_status = case_when(
+             contact_registered == "no" ~ "contact_inconnu",
+             contact_registered == "yes" & 
+             (contact_surveilled == "no" | 
+              contact_surveilled == "unknown") ~ "connu_non_suivi",
+             contact_surveilled == "yes" ~ "suivi",
+             contact_registered == "unknown" ~ "non_enregistre")) %>% 
+  mutate(contact_status = factor(contact_status, 
+                                 levels = c("non_enregistre", 
+                                            "contact_inconnu",
+                                            "connu_non_suivi", 
+                                            "suivi"))) 
+
+```
+
+
+
+## Define sub-coordinations
+
+Sub-coordinations are determined from the `zone_de_sante` variable, using
+cleaning rules to assign each zone to a sub-coordination.
+
+```{r sous_coordination}
+
+# clean_variable_spelling assigns sous_coordination from zs (relies on spelling)
+x <- x %>%
+  mutate(sous_coordination = zone_de_sante) %>%
+  clean_variable_spelling(wordlists = cleaning_rules) 
+
+# Check for NAs and mispellings
+table(x$zone_de_sante, x$sous_coordination, useNA = "ifany")
+
+```
+
+
+
+## Identify community death
+
+Community deaths are defined as deaths which occured outside ETCs and TCs. 
+
+Values of the variable `type_death` will be defined as:
+
+*  `community` if:
+  1. place of death is community
+  2. patient was dead on notification, place of death is unknown, and there is
+     no date of cte admission
+* `etc_tc` if patients died in ETCs / TCs
+* `alive` for alive patients
+* `unknown` in other situations (unknown outcomes)
+
+``` {r type_death} 
+
+table(x$type_death, useNA = "ifany")
+
+x <- x %>%
+  mutate(type_death =
+           case_when(
+               ## commu. death condition 1
+               place_death_crude == "community" ~ "community",
+               ##  commu. death condition 2
+               report_status == "dead" &
+               place_death_crude == "unknown" &
+               is.na(cte_date) ~ "community",
+               outcome == "dead" &
+               place_death_crude == "etc" ~ "etc_tc",
+               current_status %in% c("alive", "survived") ~ "alive",
+               TRUE ~ "unknown"))
+
+# Check for NAs
+table(x$type_death, useNA = "ifany")
+
+```
+
+The breakdown amongst deaths is:
+
+```{r type_death_breakdown}
+
+x %>%
+  filter(outcome == "dead") %>%
+  mutate(has_cte_date = !is.na(cte_date)) %>% 
+  count(type_death, place_death_crude, report_status, has_cte_date) %>%
+  show_table()
+
+```
+
+
+
+
+## Define provinces
+
+Province are defined from the *sub-coordinations*, which is almost exact except
+for Mandima, which needs to be re-assigned to *Ituri*.
+
+```{r provinces}
+
+# clean_variable_spelling assigns province from sc (relies on spelling)
+
+x <- x %>%
+  mutate(province = zone_de_sante) %>% 
+  clean_variable_spelling(wordlists = cleaning_rules) 
+
+## check that provinces match
+
+table(x$province, x$zone_de_sante, useNA = "ifany")
+
+```
+
+
+
+## Age and age classes
+
+This section defines age classes - see code for details.
+
+```{r clean_age}
+
+x <- x %>%
+  mutate(
+      age = as.numeric(gsub("_", ".", age)),
+      age_class = factor(
+          case_when(
+              age <= 5 ~ "<=5",
+              age <= 10 ~ "6-10",
+              age <= 17 ~ "11-17",
+              age <= 25 ~ "18-25",
+              age <= 35 ~ "26-35",
+              age <= 45 ~ "36-45",
+              age <= 55 ~ "46-55",
+              age <= 65 ~ "56-65",
+              is.finite(age) ~ "66+",
+              TRUE ~ "unknown"
+          ), levels = c(
+                 "<=5",
+                 "6-10",
+                 "11-17",
+                 "18-25",
+                 "26-35",
+                 "36-45",
+                 "46-55",
+                 "56-65",
+                 "66+",
+                 "unknown"
+             )),
+      age_class_plot = factor(
+          age_class,
+          levels = rev(levels(age_class))))
+
+## check content
+x %>%
+  group_by(age_class) %>%
+  summarise(n = n()) %>%
+  adorn_totals("row") %>%
+  show_table()
+
+```
+
+
+
+
+### Reporting delay
+
+```{r reporting_delay}
+
+x <- x %>%
+  mutate(reporting_delay = as.integer(date_report - date_onset))
+
+```
+
+
+## Duration of hospitalisation
+
+We add the duration of hospitalisation:
+
+```{r duration_hospitalisation}
+
+## rename dates of death and discharge
+x <- x %>%
+      # delay_outcome = as.integer(date_outcome - date_onset),
+      mutate(delay_admission = as.integer(cte_date - date_onset))
+      ## duration_hospitalisation = as.integer(
+      ##     date_outcome - date_admission),
+      ## documented_hospitalisation = !is.na(date_admission)
+  
+
+```
+
+
+## Healthcare workers
+
+```{r hcw}
+
+table(x$hcw, useNA = "ifany")
+
+```
+
+
+## Reorder columns
+
+```{r reorder}
+
+x <- x %>%
+  select(mllid,
+         date_onset,
+         date_report,
+         date_admission,
+         ## date_outcome,
+         ## date_discharge,
+         date_death,
+         ## date_outcome,
+         date_exposure_start,
+         date_exposure_end,
+         province,
+         sous_coordination,
+         zone_de_sante,
+         aire_de_sante,
+         age,
+         age_class,
+         hcw,
+         ## delay_outcome,
+         ## duration_hospitalisation,
+         ## documented_hospitalisation,
+         everything())
+
+```
+
+
+
+
+
+# Comparison with previous databases {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+In this section, we compare the newly cleaned database to a previous one, used
+as reference. The things that are compared include:
+
+* the **dimensions** of the data (number of rows and columns)
+* the **variable names**
+* the **type** of variables present on both data
+
+
+## Load reference database
+
+We import the reference data based on older data (cleaned as well); this part
+should be regularly updated so that the reference is a decently recent version
+of linelist:
+
+```{r load_ref, eval = FALSE}
+
+previous_clean_data
+check_file(previous_clean_data)
+x_ref <- rio::import(previous_clean_data)
+x_ref
+
+```
+
+## Compare cases counts
+
+```{r previous_database_date}
+
+## extract some dates
+last_date_onset <- max(x$date_onset, na.rm= TRUE)
+last_date_report <- max(x$date_report, na.rm= TRUE)
+
+
+## compute respective case counts
+to_keep <- c("confirmed", "probable")
+
+case_count <- x %>% 
+  dplyr::filter(epicasedef %in% to_keep) %>% 
+  nrow()
+
+```
+
+
+
+
+<font color="#0f71a2">**Previous database:**</font>
+
+<br>
+
+<font color="#10a35e">**Current database:**</font> 
+
+* Total rows: 
+* Completition date: `r format(database_date, format =
+"%A %d %b %Y")`
+* Last date of onset:  `r format(last_date_onset, format =
+"%A %d %b %Y")`.
+* Last date of report: `r format(last_date_report, format =
+"%A %d %b %Y")`.
+* case counts: `r case_count` (confirmed and probable cases)
+
+
+
+
+
+
+## Compare databases
+
+```{r compared_data, eval = FALSE}
+
+compare <- compare_data(x_ref, x,
+                        columns = c(
+                            "id",
+                            "date_onset",
+                            "date_report",
+                            "date_admission",
+                            "date_outcome",
+                            "date_death",
+                            "date_exposure_start",
+                            "date_exposure_end",
+                            "province",
+                            "sous_coordination",
+                            "zone_de_sante",
+                            "aire_de_sante",
+                            "age",
+                            "age_class",
+                            "gender",
+                            "hcw"))
+
+print(compare, diff_only = TRUE)
+
+
+
+```
+
+
+
+
+# Looking for duplicates {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+In this section we identify duplicated identifiers, isolate the corresponding
+entries and output a data table.
+
+
+## Finding duplicates
+
+```{r duplicates}
+dup2 <- x %>% 
+  filter(!is.na(vhf_code))
+
+
+duplicates <- dup2$vhf_code[duplicated(dup2$vhf_code)]
+
+duplicates 
+
+```
+
+There are `r length(duplicates)` duplicates in the data, corresponding to 
+`r sum(x$id %in% duplicates)` rows in the linelist.
+
+
+## Table of duplicates
+
+```{r duplicates_table}
+
+duplicates_table <- x %>%
+  filter(x$vhf_code %in% duplicates) %>%
+  select(vhf_code,
+         surname,
+         epicasedef,
+         gender,
+         age,
+         date_report,
+         date_onset,
+         everything()) %>% 
+  arrange(vhf_code,
+          surname,
+          epicasedef,
+          gender,
+          age,
+          date_report,
+          date_onset)
+
+if (nrow(duplicates_table) > 0) {
+  duplicates_table %>%
+    show_table()
+}
+
+```
+
+
+
+
+# Export data {.tabset .tabset-fade .tabset-pills}
+
+## R objects
+
+We export some of the clean database, placed in `produced_rds/` as well as in
+`data/clean/`:
+
+```{r export_rds}
+
+## check if a directory exists and if not then creates it
+if (!dir.exists("produced_rds")) {
+  dir.create("produced_rds")
+}
+
+## create the text for the file name with the database date
+rds_file_name <- sprintf("%sclean_%s.rds",
+                     undated_file_name(current_data),
+                     format(database_date, "%Y-%m-%d"))
+rds_file_name
+
+## save the rds file in the produced_rds folder
+rio::export(x,
+            file.path("produced_rds", rds_file_name))
+
+```
+
+We copy these files to the `data/clean` folder:
+
+```{r copy_rds}
+# copy some files into `data/clean/`
+
+# Provide the destination of where to copy the data
+destination <- here("data",
+                    "clean",
+                    rds_file_name)
+# Copy the rds data
+file.copy(from = file.path("produced_rds", rds_file_name),
+          to = destination,
+          overwrite = TRUE)
+
+```
+
+
+
+## Excel spreadsheets
+
+We export some of the clean database, placed in `produced_xlsx/` as well as in
+`data/clean/`:
+
+```{r export_excel}
+
+## check if a directory exists and if not then creates it
+if (!dir.exists("produced_xlsx")) {
+  dir.create("produced_xlsx")
+}
+
+## create the text for the file name with the database date
+xlsx_file_name <- sprintf("%sclean_%s.xlsx",
+                     undated_file_name(current_data),
+                     format(database_date, "%Y-%m-%d"))
+xlsx_file_name
+
+## save the excel file in the produced_xlsx folder
+
+rio::export(x,
+            file.path("produced_xlsx", xlsx_file_name))
+
+
+## same procedure for duplicates table
+dupli_file_name <- sprintf("%sduplicates_%s.xlsx",
+                     undated_file_name(current_data),
+                     format(database_date, "%Y-%m-%d"))
+dupli_file_name
+
+## save the excel file in the produced_rds folder
+
+rio::export(duplicates_table,
+            file.path("produced_xlsx", dupli_file_name))
+
+
+```
+
+We copy these files to the `data/clean` folder:
+
+```{r copy_excel}
+
+## copy the clean xlsx file to `data/clean/`
+destination <- here("data",
+                    "clean",
+                    xlsx_file_name)
+file.copy(from = file.path("produced_xlsx", xlsx_file_name),
+          to = destination,
+          overwrite = TRUE)
+
+
+## copy the xlsx of duplicates file to `data/duplicates/`
+destination <- here("data",
+                    "duplicates",
+                    dupli_file_name)
+file.copy(from = file.path("produced_xlsx", dupli_file_name),
+          to = destination,
+          overwrite = TRUE)
+
+```
+
+
+```
+
+## Links to file
+
+Click on the link below to open the file:
+
+- [`r file_name`](`r file.path("produced_xlsx", xlsx_file_name)`)
+- [`r dupli_file_name`](`r file.path("produced_xlsx", dupli_file_name)`)
+
+
+
+## Update the `current_clean_data.R` script
+
+```{r update_script}
+
+## path to the output file 
+script_destination <- here::here("scripts",
+                                 "current_clean_data.R")
+
+## comments to say when this was updated
+txt <- paste("## This file is generated automatically by `aaa_clean_linelist`",
+             "## Do not edit it by hand!\n",
+             sep = "\n")
+cat(txt, file = script_destination, append = FALSE)
+
+txt <- sprintf("\n## This file was last updated on the: %s\n",
+               Sys.time())
+cat(txt, file = script_destination, append = TRUE)
+
+## actual content of the script
+txt <- sprintf('\ncurrent_clean_data <- here::here("data",
+                                 "clean",
+                                 "%s")',
+               rds_file_name)
+cat(txt, file = script_destination, append = TRUE)
+
+```
+
+
+# System information {.tabset .tabset-fade .tabset-pills}
+
+The following information documents the system on which the document was
+compiled.
+
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+R.version
+```
+
+
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+sessionInfo()
+```
+
