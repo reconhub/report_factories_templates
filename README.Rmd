@@ -73,3 +73,40 @@ where `xxx` is a character string uniquely present in the type of data to use.
 
 
 <br>
+
+
+## *linelist_investigations*: analyses from the Ebola North Kivu analytics cell
+
+### Outline
+
+This factory contains several reports providing analyses based on the Master
+Line List (MLL), used routinely by the analytics cell of the Ebola response
+based in the Emergency Operation Center, North Kivu, DRC. 
+
+Note that as data are confidential, these are not shared here. Reports are meant
+to work with the MLL data structure, and will need some adaptations for other
+linelist data.
+
+Reports include:
+
+* `aaa_clean_linelist`: data cleaning for the master linelist; will create a
+  clean dataset in `rds` and `xlsx` format, and generate a
+  `current_clean_data.R` script in `scripts/` which sets the path to the newly
+  cleaned data
+  
+* `active_health_areas`: analysis of geographic spread over time, represented by
+  the number of active health areas (i.e. having reported cases over the last 21
+  days)
+
+* `age_sex`: age-sex pyramids, stratified by geographic units and in time
+
+* `temporal_trends`: trends of various proportions in time, with some
+  geographical stratifications, including
+    + proportions of community death
+    + proportions of cases known as contacts
+
+* `epicurves`: epicurves with various stratifications, by case characteristics
+  and by geographic units
+
+* `kpi`: key performance indicators, used for general summaries of the state of
+  the response
