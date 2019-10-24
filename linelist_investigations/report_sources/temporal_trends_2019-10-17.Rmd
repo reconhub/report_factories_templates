@@ -1,6 +1,6 @@
 ---
 title: "Temporal trends"
-author: "Thibaut Jombart, Christopher Jarvis, Jonathan Polonsky, for the analytic cell EOC Goma"
+author: "Thibaut Jombart, Christopher Jarvis, Jonathan Polonsky, Amy Gimma, Arthur Fitzmaurice for the analytic cell EOC Goma"
 date: "`r format(Sys.time(), '%A %d %B %Y')`"
 output:
   html_document:
@@ -36,7 +36,7 @@ knitr::opts_chunk$set(echo = TRUE,
   
   **Maintainer:** Thibaut Jombart (thibautjombart@gmail.com)
   
-  **Code contributors:** Christopher Jarvis, Thibaut Jombart, Amy Gimma
+  **Code contributors:** Christopher Jarvis, Thibaut Jombart, Amy Gimma, Arthur Fitzmaurice
   
   **Data contributors:** Yannick Tutu, Richie Ngombo
   
@@ -182,6 +182,7 @@ In this part we define custom colors and color scales for further plotting.
 ```{r custom_colors}
 
 color_known_contact <- "#117A65"
+color_followed_contact <- "#073a30"
 color_community_death <- "#DD5327"
 
 ```
@@ -207,11 +208,12 @@ color_community_death <- "#DD5327"
 We use the variable `contact_registered` to estimate the proportions of cases
 who are known contacts:
 
-* overall, monthly 
+* overall, weekly 
 * by sub-coordination, monthly
 * for the main recently active health zones, monthly
 
 Each analysis will present:
+
 * overall results aggregated for the whole time period
 * a temporal breakdown
 
@@ -326,13 +328,13 @@ The analysis proceeds with the following steps:
 1. calculate numbers by sub-coordination and corresponding proportions and
    confidence intervals
    
-2. calculate weekly numbers and corresponding proportions and confidence
+2. calculate monthly numbers and corresponding proportions and confidence
    intervals
 
 3. plot overall numbers by sub-coordination
 
 4. plot temporal trends, retaining only sub-coordinations for which the average
-   monthly uncertainty is is less than 60%
+   monthly uncertainty is less than 60%
 
 5. create a table from 1, renaming columns and displaying it 
 
@@ -405,7 +407,7 @@ ggplot(aes(x = month_report, y = p)) +
        y = "% de cas mensuels connus comme contact")
 
 
-## step 4
+## step 5
 table_contacts_sub_coordination <- contacts_sub_coordination %>% 
   select(sous_coordination,
          "% contact connu" = p,
@@ -418,7 +420,7 @@ table_contacts_sub_coordination %>%
   show_table()
 
 
-# step 5
+# step 6
 table_contacts_sub_coordination_time <- contacts_sub_coordination_time %>% 
   select(mois = month_report,
          sous_coordination,
@@ -434,6 +436,474 @@ table_contacts_sub_coordination_time %>%
 ```
 
 
+
+<!-- ======================================================= -->
+## By top zones
+
+The analysis proceeds with the following steps:
+  
+1. calculate numbers by zone and corresponding proportions and
+    confidence intervals, constrained to top zones in recent 42 days
+
+2. calculate monthly numbers and corresponding proportions and confidence
+    intervals
+
+3. plot overall numbers by zone, constrained to top zones in recent 42 days
+
+4. plot temporal trends, retaining only sub-coordinations for which the average
+    monthly uncertainty is less than 60%
+
+5. create a table from 1, renaming columns and displaying it 
+
+6. create a table from 2, renaming columns and displaying it 
+
+
+```{r contacts_top_zones}
+
+## step 1
+contacts_top_zones <- x %>%
+  count(top_zones, contact_registered) %>%
+  spread(contact_registered, n, fill = 0, drop = FALSE) %>%
+  adorn_totals("col", name = "total") %>% 
+  mutate(denom = total - unknown,
+         p = prop_to_perc(yes / denom),
+         p_lower = prop_ci(yes, denom, "lower", perc = TRUE),
+         p_upper = prop_ci(yes, denom, "upper", perc = TRUE))
+
+
+## step 2
+contacts_top_zones_time <- x %>%
+  count(top_zones, month_report, contact_registered) %>%
+  spread(contact_registered, n, fill = 0) %>%
+  adorn_totals(c("col"), name = "total") %>% 
+  mutate(denom = total - unknown,
+         p = prop_to_perc(yes / denom),
+         p_lower = prop_ci(yes, denom, "lower", perc = TRUE),
+         p_upper = prop_ci(yes, denom, "upper", perc = TRUE))
+
+
+## step 3
+ggplot(contacts_top_zones, aes(x = top_zones, y = p)) +
+  theme_bw() +
+  geom_errorbar(aes(ymin = p_lower, ymax = p_upper),
+                color = color_known_contact) +
+  geom_point(color = color_known_contact, size = 2) +
+  geom_label(aes(y = p_upper + 10, label = paste0("n=", denom))) +
+  large_txt +
+  coord_flip() +
+  scale_y_continuous(breaks = seq(0, 100, by = 20),
+                     limit = c(0, 110)) +
+  labs(title = "Proportion de cas connus comme contacts\npar zone de santé",
+       x = "",
+       y = "% de cas connus comme contacts")
+
+
+## step 4
+to_keep <- contacts_top_zones_time %>%
+  group_by(top_zones) %>%
+  filter(mean(p_upper - p_lower) < 60) %>%
+  pull(top_zones) %>%
+  unique()
+
+contacts_top_zones_time %>%
+  filter(top_zones %in% to_keep) %>% 
+  ggplot(aes(x = month_report, y = p)) +
+  theme_bw() +
+  geom_ribbon(aes(ymin = p_lower, ymax = p_upper),
+              alpha = .3, fill = color_known_contact) +
+  geom_point(color = color_known_contact) +
+  geom_line(color = color_known_contact) +
+  scale_y_continuous(limits = c(0, 100)) +
+  scale_months +
+  rotate_x_text(45) +
+  facet_wrap(top_zones ~ ., nrow = 2) +
+  large_txt +
+  custom_vert_facet +
+  labs(title = "Proportion de cas connus comme contacts",
+       x = "Mois de notification",
+       y = "% de cas mensuels connus comme contact")
+
+
+## step 5
+table_contacts_top_zones <- contacts_top_zones %>% 
+  select(top_zones,
+         "% contact connu" = p,
+         "IC95% lower" = p_lower,
+         "IC95% upper" = p_upper,
+         n = denom,
+         everything())
+
+table_contacts_top_zones %>%
+  show_table()
+
+
+# step 6
+table_contacts_top_zones_time <- contacts_top_zones_time %>% 
+  select(mois = month_report,
+         top_zones,
+         "% contact connu" = p,
+         "IC95% lower" = p_lower,
+         "IC95% upper" = p_upper,
+         n = denom,
+         everything())
+
+table_contacts_top_zones_time %>%
+  show_table()
+
+```
+
+
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# Contacts: known & followed {.tabset .tabset-fade .tabset-pills}
+      
+<!-- ======================================================= -->
+## Outline 
+        
+We use the variable `contact_surveilled` to estimate the proportions of cases
+who are known and followed contacts:
+        
+* overall, weekly 
+* by sub-coordination, monthly
+* for the main recently active health zones, monthly
+      
+Each analysis will present:
+
+* overall results aggregated for the whole time period
+* a temporal breakdown
+      
+For each proportion, we derive the exact binomial confidence interval.
+      
+
+<!-- ======================================================= -->
+## Note
+        
+We will rely on `adorn_totals` for computing totals. This approach needs to take into account an
+[issue](https://github.com/sfirke/janitor/issues/285) with `adorn_totals`, which
+ignores the first column of data assuming it is a grouping factor. This will no
+be a problem for further stratification, where the function can be used safely.
+      
+      
+      
+<!-- ======================================================= -->
+## Overall
+        
+The analysis proceeds with the following steps:
+        
+1. calculate overall numbers and corresponding proportions and confidence intervals
+
+2. calculate weekly numbers and corresponding proportions and confidence intervals
+      
+3. plot temporal trends
+      
+4. create a table from 1, renaming columns and displaying it 
+      
+5. create a table from 2, renaming columns and displaying it 
+      
+      
+```{r followed_overall}
+      
+## step 1
+followed_overall <- x %>%
+  count(contact_surveilled) %>%
+  spread(contact_surveilled, n, fill = 0, drop = FALSE) %>%
+  mutate(total = nrow(x), # avoid adorn_totals
+      denom = total - unknown,
+      p = prop_to_perc(yes / denom),
+      p_lower = prop_ci(yes, denom, "lower", perc = TRUE),
+      p_upper = prop_ci(yes, denom, "upper", perc = TRUE))
+      
+      
+## step 2
+followed_overall_time <- x %>%
+  count(epiweek_report_label, contact_surveilled) %>%
+  spread(contact_surveilled, n, fill = 0, drop = FALSE) %>%
+  adorn_totals(c("col"), name = "total") %>% 
+  mutate(denom = total - unknown,
+      p = prop_to_perc(yes / denom),
+      p_lower = prop_ci(yes, denom, "lower", perc = TRUE),
+      p_upper = prop_ci(yes, denom, "upper", perc = TRUE))
+      
+      
+## step 3
+ggplot(followed_overall_time, aes(x = epiweek_report_label, y = p)) +
+  theme_bw() +
+  geom_ribbon(aes(ymin = p_lower, ymax = p_upper),
+              alpha = .3, fill = color_followed_contact) +
+  geom_point(color = color_followed_contact) +
+  geom_line(color = color_followed_contact) +
+  scale_y_continuous(limits = c(0, 100)) +
+  scale_months +
+  rotate_x_text(45) +
+  large_txt +
+  labs(title = "Proportion de cas connus comme contacts et suivi",
+      x = "Semaine de notification",
+      y = "% de cas hebdomadaires\nconnus comme contact et suivi")
+      
+      
+## step 4
+table_followed_overall <- followed_overall %>% 
+  select("% contact connu et suivi" = p,
+      "IC95% lower" = p_lower,
+      "IC95% upper" = p_upper,
+      n = denom,
+      everything())
+      
+table_followed_overall %>%
+  show_table()
+      
+      
+# step 5
+table_followed_overall_time <- followed_overall_time %>% 
+  select(semaine = epiweek_report_label,
+      "% contact connu et suivi" = p,
+      "IC95% lower" = p_lower,
+      "IC95% upper" = p_upper,
+      n = denom,
+      everything())
+      
+table_followed_overall_time %>%
+  show_table()
+      
+```
+      
+      
+      
+
+<!-- ======================================================= -->
+## By sub-coordination
+        
+The analysis proceeds with the following steps:
+        
+1. calculate numbers by sub-coordination and corresponding proportions and confidence intervals
+
+2. calculate monthly numbers and corresponding proportions and confidence intervals
+
+3. plot overall numbers by sub-coordination
+
+4. plot temporal trends, retaining only sub-coordinations for which the average
+    monthly uncertainty is less than 60%
+
+5. create a table from 1, renaming columns and displaying it 
+
+6. create a table from 2, renaming columns and displaying it 
+
+
+```{r followed_sub_coordination}
+
+## step 1
+followed_sub_coordination <- x %>%
+  count(sous_coordination, contact_surveilled) %>%
+  spread(contact_surveilled, n, fill = 0, drop = FALSE) %>%
+  adorn_totals("col", name = "total") %>% 
+  mutate(denom = total - unknown,
+        p = prop_to_perc(yes / denom),
+        p_lower = prop_ci(yes, denom, "lower", perc = TRUE),
+        p_upper = prop_ci(yes, denom, "upper", perc = TRUE))
+
+
+## step 2
+followed_sub_coordination_time <- x %>%
+  count(sous_coordination, month_report, contact_surveilled) %>%
+  spread(contact_surveilled, n, fill = 0) %>%
+  adorn_totals(c("col"), name = "total") %>% 
+  mutate(denom = total - unknown,
+        p = prop_to_perc(yes / denom),
+        p_lower = prop_ci(yes, denom, "lower", perc = TRUE),
+        p_upper = prop_ci(yes, denom, "upper", perc = TRUE))
+
+
+## step 3
+ggplot(followed_sub_coordination, aes(x = sous_coordination, y = p)) +
+  theme_bw() +
+  geom_errorbar(aes(ymin = p_lower, ymax = p_upper),
+    color = color_followed_contact) +
+  geom_point(color = color_followed_contact, size = 2) +
+  geom_label(aes(y = p_upper + 10, label = paste0("n=", denom))) +
+  large_txt +
+  coord_flip() +
+  scale_y_continuous(breaks = seq(0, 100, by = 20),
+    limit = c(0, 110)) +
+  labs(title = "Proportion de cas connus comme contacts et suivi\npar sous-coordination",
+    x = "",
+    y = "% de cas connus comme contacts et suivi")
+
+
+## step 4
+to_keep <- followed_sub_coordination_time %>%
+  group_by(sous_coordination) %>%
+  filter(mean(p_upper - p_lower) < 60) %>%
+  pull(sous_coordination) %>%
+  unique()
+
+followed_sub_coordination_time %>%
+  filter(sous_coordination %in% to_keep) %>% 
+  ggplot(aes(x = month_report, y = p)) +
+  theme_bw() +
+  geom_ribbon(aes(ymin = p_lower, ymax = p_upper),
+    alpha = .3, fill = color_followed_contact) +
+  geom_point(color = color_followed_contact) +
+  geom_line(color = color_followed_contact) +
+  scale_y_continuous(limits = c(0, 100)) +
+  scale_months +
+  rotate_x_text(45) +
+  facet_wrap(sous_coordination ~ ., nrow = 2) +
+  large_txt +
+  custom_vert_facet +
+  labs(title = "Proportion de cas connus comme contacts et suivi",
+    x = "Mois de notification",
+    y = "% de cas mensuels connus comme contact et suivi")
+
+
+## step 5
+table_followed_sub_coordination <- followed_sub_coordination %>% 
+  select(sous_coordination,
+        "% contact connu et suivi" = p,
+        "IC95% lower" = p_lower,
+        "IC95% upper" = p_upper,
+        n = denom,
+        everything())
+
+table_followed_sub_coordination %>%
+  show_table()
+
+
+# step 6
+table_followed_sub_coordination_time <- followed_sub_coordination_time %>% 
+  select(mois = month_report,
+         sous_coordination,
+         "% contact connu et suivi" = p,
+         "IC95% lower" = p_lower,
+         "IC95% upper" = p_upper,
+         n = denom,
+         everything())
+
+table_followed_sub_coordination_time %>%
+  show_table()
+
+```
+
+
+
+<!-- ======================================================= -->
+## By top zones
+  
+The analysis proceeds with the following steps:
+  
+1. calculate numbers by zone and corresponding proportions and confidence intervals,
+    constrained to top zones in recent 42 days
+
+2. calculate monthly numbers and corresponding proportions and confidence intervals
+
+3. plot overall numbers by top zones, constrained to top zones in recent 42 days
+
+4. plot temporal trends, retaining only top zoness for which the average
+monthly uncertainty is less than 60%
+
+5. create a table from 1, renaming columns and displaying it 
+
+6. create a table from 2, renaming columns and displaying it 
+
+
+```{r followed_top_zones}
+
+## step 1
+followed_top_zones <- x %>%
+  count(top_zones, contact_surveilled) %>%
+  spread(contact_surveilled, n, fill = 0, drop = FALSE) %>%
+  adorn_totals("col", name = "total") %>% 
+  mutate(denom = total - unknown,
+         p = prop_to_perc(yes / denom),
+         p_lower = prop_ci(yes, denom, "lower", perc = TRUE),
+         p_upper = prop_ci(yes, denom, "upper", perc = TRUE))
+
+
+## step 2
+followed_top_zones_time <- x %>%
+  count(top_zones, month_report, contact_surveilled) %>%
+  spread(contact_surveilled, n, fill = 0) %>%
+  adorn_totals(c("col"), name = "total") %>% 
+  mutate(denom = total - unknown,
+         p = prop_to_perc(yes / denom),
+         p_lower = prop_ci(yes, denom, "lower", perc = TRUE),
+         p_upper = prop_ci(yes, denom, "upper", perc = TRUE))
+
+
+## step 3
+ggplot(followed_top_zones, aes(x = top_zones, y = p)) +
+  theme_bw() +
+  geom_errorbar(aes(ymin = p_lower, ymax = p_upper),
+                color = color_followed_contact) +
+  geom_point(color = color_followed_contact, size = 2) +
+  geom_label(aes(y = p_upper + 10, label = paste0("n=", denom))) +
+  large_txt +
+  coord_flip() +
+  scale_y_continuous(breaks = seq(0, 100, by = 20),
+                     limit = c(0, 110)) +
+  labs(title = "Proportion de cas connus comme contacts et suivi\npar zone de santé",
+       x = "",
+       y = "% de cas connus comme contacts et suivi")
+
+
+## step 4
+to_keep <- followed_top_zones_time %>%
+  group_by(top_zones) %>%
+  filter(mean(p_upper - p_lower) < 60) %>%
+  pull(top_zones) %>%
+  unique()
+
+followed_top_zones_time %>%
+  filter(top_zones %in% to_keep) %>% 
+  ggplot(aes(x = month_report, y = p)) +
+  theme_bw() +
+  geom_ribbon(aes(ymin = p_lower, ymax = p_upper),
+              alpha = .3, fill = color_followed_contact) +
+  geom_point(color = color_followed_contact) +
+  geom_line(color = color_followed_contact) +
+  scale_y_continuous(limits = c(0, 100)) +
+  scale_months +
+  rotate_x_text(45) +
+  facet_wrap(top_zones ~ ., nrow = 2) +
+  large_txt +
+  custom_vert_facet +
+  labs(title = "Proportion de cas connus comme contacts et suivi",
+       x = "Mois de notification",
+       y = "% de cas mensuels connus comme contact et suivi")
+
+
+## step 5
+table_followed_top_zones <- followed_top_zones %>% 
+  select(top_zones,
+         "% contact connu et suivi" = p,
+         "IC95% lower" = p_lower,
+         "IC95% upper" = p_upper,
+         n = denom,
+         everything())
+
+table_followed_top_zones %>%
+  show_table()
+
+
+# step 6
+table_followed_top_zones_time <- followed_top_zones_time %>% 
+  select(mois = month_report,
+         top_zones,
+         "% contact connu et suivi" = p,
+         "IC95% lower" = p_lower,
+         "IC95% upper" = p_upper,
+         n = denom,
+         everything())
+
+table_followed_top_zones_time %>%
+  show_table()
+
+```
 
 
 
@@ -451,11 +921,12 @@ table_contacts_sub_coordination_time %>%
 We use the variable `community_death_registered` to estimate the proportions of cases
 who are known community_deaths:
 
-* overall, monthly 
+* overall, weekly 
 * by sub-coordination, monthly
 * for the main recently active health zones, monthly
 
 Each analysis will present:
+
 * overall results aggregated for the whole time period
 * a temporal breakdown
 
@@ -570,13 +1041,13 @@ The analysis proceeds with the following steps:
 1. calculate numbers by sub-coordination and corresponding proportions and
    confidence intervals
    
-2. calculate weekly numbers and corresponding proportions and confidence
+2. calculate monthly numbers and corresponding proportions and confidence
    intervals
 
 3. plot overall numbers by sub-coordination
 
 4. plot temporal trends, retaining only sub-coordinations for which the average
-   monthly uncertainty is is less than 60%
+   monthly uncertainty is less than 60%
 
 5. create a table from 1, renaming columns and displaying it 
 
@@ -649,7 +1120,7 @@ ggplot(aes(x = month_report, y = p)) +
        y = "% de décès communautaires")
 
 
-## step 4
+## step 5
 table_community_deaths_sub_coordination <- community_deaths_sub_coordination %>% 
   select(sous_coordination,
          "% community_death connu" = p,
@@ -662,7 +1133,7 @@ table_community_deaths_sub_coordination %>%
   show_table()
 
 
-# step 5
+# step 6
 table_community_deaths_sub_coordination_time <- community_deaths_sub_coordination_time %>% 
   select(mois = month_report,
          sous_coordination,
@@ -678,6 +1149,121 @@ table_community_deaths_sub_coordination_time %>%
 ```
 
 
+
+<!-- ======================================================= -->
+## By top zones
+  
+The analysis proceeds with the following steps:
+  
+1. calculate numbers by zone and corresponding proportions and
+    confidence intervals, constrained to top zones in recent 42 days
+
+2. calculate monthly numbers and corresponding proportions and confidence
+    intervals
+
+3. plot overall numbers by zone, constrained to top zones in recent 42 days
+
+4. plot temporal trends, retaining only zones for which the average
+    monthly uncertainty is less than 60%
+
+5. create a table from 1, renaming columns and displaying it 
+
+6. create a table from 2, renaming columns and displaying it 
+
+
+```{r community_deaths_top_zones}
+
+## step 1
+community_deaths_top_zones <- x %>%
+  count(top_zones, type_death) %>%
+  spread(type_death, n, fill = 0, drop = FALSE) %>%
+  adorn_totals("col", name = "total") %>% 
+  mutate(denom = total,
+         p = prop_to_perc(community / denom),
+         p_lower = prop_ci(community, denom, "lower", perc = TRUE),
+         p_upper = prop_ci(community, denom, "upper", perc = TRUE))
+
+
+## step 2
+community_deaths_top_zones_time <- x %>%
+  count(top_zones, month_report, type_death) %>%
+  spread(type_death, n, fill = 0) %>%
+  adorn_totals(c("col"), name = "total") %>% 
+  mutate(denom = total,
+         p = prop_to_perc(community / denom),
+         p_lower = prop_ci(community, denom, "lower", perc = TRUE),
+         p_upper = prop_ci(community, denom, "upper", perc = TRUE))
+
+
+## step 3
+ggplot(community_deaths_top_zones, aes(x = top_zones, y = p)) +
+  theme_bw() +
+  geom_errorbar(aes(ymin = p_lower, ymax = p_upper),
+                color = color_community_death) +
+  geom_point(color = color_community_death, size = 2) +
+  geom_label(aes(y = p_upper + 10, label = paste0("n=", denom))) +
+  large_txt +
+  coord_flip() +
+  scale_y_continuous(breaks = seq(0, 100, by = 20),
+                     limit = c(0, 110)) +
+  labs(title = "Proportion de décès communautaires\npar zone de santé",
+       x = "",
+       y = "% de décès communautaires")
+
+
+## step 4
+to_keep <- community_deaths_top_zones_time %>%
+  group_by(top_zones) %>%
+  filter(mean(p_upper - p_lower) < 60) %>%
+  pull(top_zones) %>%
+  unique()
+
+community_deaths_top_zones_time %>%
+  filter(top_zones %in% to_keep) %>% 
+  ggplot(aes(x = month_report, y = p)) +
+  theme_bw() +
+  geom_ribbon(aes(ymin = p_lower, ymax = p_upper),
+              alpha = .3, fill = color_community_death) +
+  geom_point(color = color_community_death) +
+  geom_line(color = color_community_death) +
+  scale_y_continuous(limits = c(0, 100)) +
+  scale_months +
+  rotate_x_text(45) +
+  facet_wrap(top_zones ~ ., nrow = 2) +
+  large_txt +
+  custom_vert_facet +
+  labs(title = "Proportion de décès communautaires",
+       x = "Mois de notification",
+       y = "% de décès communautaires")
+
+
+## step 5
+table_community_deaths_top_zones <- community_deaths_top_zones %>% 
+  select(top_zones,
+         "% community_death connu" = p,
+         "IC95% lower" = p_lower,
+         "IC95% upper" = p_upper,
+         n = denom,
+         everything())
+
+table_community_deaths_top_zones %>%
+  show_table()
+
+
+# step 6
+table_community_deaths_top_zones_time <- community_deaths_top_zones_time %>% 
+  select(mois = month_report,
+         top_zones,
+         "% community_death connu" = p,
+         "IC95% lower" = p_lower,
+         "IC95% upper" = p_upper,
+         n = denom,
+         everything())
+
+table_community_deaths_top_zones_time %>%
+  show_table()
+
+```
 
 
 
@@ -705,7 +1291,21 @@ if (!dir.exists("produced_xlsx")) {
 to_export <- c("table_contacts_overall",
                "table_contacts_overall_time",
                "table_contacts_sub_coordination",
-               "table_contacts_sub_coordination_time")
+               "table_contacts_sub_coordination_time",
+               "table_contacts_top_zones",
+               "table_contacts_top_zones_time",
+               "table_followed_overall",
+               "table_followed_overall_time",
+               "table_followed_sub_coordination",
+               "table_followed_sub_coordination_time",
+               "table_followed_top_zones",
+               "table_followed_top_zones_time",
+               "table_community_deaths_overall",
+               "table_community_deaths_overall_time",
+               "table_community_deaths_sub_coordination",
+               "table_community_deaths_sub_coordination_time",
+               "table_community_deaths_top_zones",
+               "table_community_deaths_top_zones_time")
 
 for (e in to_export) {
   rio::export(get(e),
