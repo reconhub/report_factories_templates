@@ -258,17 +258,15 @@ x <- x %>%
 
 x <- x %>%
   mutate(contact_status = case_when(
-             contact_registered == "no" ~ "contact_inconnu",
+             (contact_registered == "no" | contact_registered == "unknown") ~ "contact_inconnu",
              contact_registered == "yes" & 
-             (contact_surveilled == "no" | 
-              contact_surveilled == "unknown") ~ "connu_non_suivi",
-             contact_surveilled == "yes" ~ "suivi",
-             contact_registered == "unknown" ~ "non_enregistre")) %>% 
+                (contact_surveilled == "no" | 
+                contact_surveilled == "unknown") ~ "connu_non_suivi",
+             contact_surveilled == "yes" ~ "suivi")) %>% 
   mutate(contact_status = factor(contact_status, 
-                                 levels = c("non_enregistre", 
-                                            "contact_inconnu",
+                                 levels = c("contact_inconnu",
                                             "connu_non_suivi", 
-                                            "suivi"))) 
+                                            "suivi")))
 
 ```
 
@@ -318,11 +316,11 @@ x <- x %>%
                place_death_crude == "community" ~ "community",
                ##  commu. death condition 2
                report_status == "dead" &
-               place_death_crude == "unknown" &
-               is.na(cte_date) ~ "community",
-               outcome == "dead" &
-               place_death_crude == "etc" ~ "etc_tc",
-               current_status %in% c("alive", "survived") ~ "alive",
+                place_death_crude == "unknown" &
+                is.na(cte_date) ~ "community",
+               final_outcome == "dead" &
+                place_death_crude == "etc" ~ "etc_tc",
+               final_outcome %in% c("alive", "survived") ~ "alive",
                TRUE ~ "unknown"))
 
 # Check for NAs
@@ -458,6 +456,7 @@ table(x$hcw, useNA = "ifany")
 
 x <- x %>%
   select(mllid,
+         epiweek_onset,
          date_onset,
          date_report,
          date_admission,
@@ -467,13 +466,32 @@ x <- x %>%
          ## date_outcome,
          date_exposure_start,
          date_exposure_end,
+         reporting_delay,
+         delay_admission,
          province,
          sous_coordination,
          zone_de_sante,
          aire_de_sante,
          age,
          age_class,
+         sex,
          hcw,
+         hcw_facility,
+         ## hcw_facility_fosa_code,
+         epicasedef,
+         report_status,
+         final_outcome,
+         contact_registered,
+         contact_surveilled,
+         contact_notsurveilled_reason,
+         contact_status,
+         vacc,
+         date_vacc,
+         ## type_vacc,
+         number_hcf,
+         transmission_place_group,
+         type_death,
+         ## place_death_crude,
          ## delay_outcome,
          ## duration_hospitalisation,
          ## documented_hospitalisation,
