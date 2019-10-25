@@ -261,14 +261,14 @@ git checkout xxx
 
 where `xxx` should be the name of the branch of the PR.
 
-    + make sure the data needed for the report are present at the right place in your
+    2. make sure the data needed for the report are present at the right place in your
 `data` folder; for `aaa_clean_data`, this will be a raw `xlsx` master linelist
 file in `data/raw`; for other reports, this will be the cleaned `rds` data in
 `data/clean/`, accompanied by a script in `scripts/current_clean_data.R`
 pointing to the right file (generated automatically when `aaa_clean_data` is
 compiled
 
-    2. compile the report by opening the `open.Rproj` file in the root of the
+    3. compile the report by opening the `open.Rproj` file in the root of the
 factory, and typing:
 	
 
@@ -278,7 +278,7 @@ reportfactory::compile_report("report_name_date.Rmd", clean_report_sources = TRU
 
 where `"report_name_date.Rmd"` is the name and date of the report changed.
 
-    + if the compilation is successful, check the output produced in `report_outputs/report_name_date/...`; go back to the review page on github and complete your review according to your observations
+    4. if the compilation is successful, check the output produced in `report_outputs/report_name_date/...`; go back to the review page on github and complete your review according to your observations
 	
 
 6. when your review is finished, conclude it by clicking on '**Review changes**'
