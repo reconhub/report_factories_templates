@@ -1,3 +1,15 @@
+.img {
+  width: 400px;
+  height: 200px;
+  border:2px solid #fff;
+  background: url(img/tiger.png) no-repeat;
+  -moz-box-shadow: 10px 10px 5px #ccc;
+  -webkit-box-shadow: 10px 10px 5px #ccc;
+  box-shadow: 10px 10px 5px #ccc;
+  -moz-border-radius:25px;
+  -webkit-border-radius:25px;
+  border-radius:25px;
+}
 
 
 <!-- ========================================== -->
@@ -230,7 +242,7 @@ weak points. This will involve the following steps:
    the PR; or you may just volonteer to perform a review to address an existing
    [issue](issues); the landing page should ressemble the image below:
    
-<img src="images/pr_illustrated.png" alt="example of PR page" style="-webkit-filter: drop-shadow(5px 5px 5px #222); filter: drop-shadow(5px 5px 5px #222);">
+<img src="images/pr_illustrated.png" alt="example of PR page">
 
 
 <br>
