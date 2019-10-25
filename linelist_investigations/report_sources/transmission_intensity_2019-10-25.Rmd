@@ -1,0 +1,457 @@
+---
+title: "Estimating transmission intensity"
+author: "Thibaut Jombart and Christopher Jarvis for the analytic cell EOC North Kivu"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document:
+    toc: TRUE
+    toc_depth: 4
+    toc_float: true
+    toc_collapse: false
+    number_sections: true
+    highlight: pygments
+    theme: spacelab
+    code_folding: hide
+    css: !expr here::here('css', 'style.css')
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      collapse = TRUE,
+                      fig.width = 10,
+                      fig.height = 6,
+                      dpi = 150,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+
+
+<br>
+
+**Maintainer:** Thibaut Jombart (thibautjombart@gmail.com)
+
+**Code contributors:** Thibaut Jombart, Chris Jarvis
+
+**Data contributors:** Richie Ngombo, Yannick Tutu
+
+**Version:** 1.0.0
+
+**Reviewed by:** 
+
+**Notice**: this is a **stable, routine report**. **Do not touch it unless it is
+broken.** To make a contribution, carefully read the
+[README](../../../../../README.html) file.
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+<!-- ======================================================= -->
+## Outline
+
+This report produces estimates of a infection intensity based on the expected
+number of secondary cases produced over the last 21 days by different geographic
+units, taking into account the infectious period and the delay to isolation of
+each case. It uses the cleaned Master Linelist database.
+
+### Data used
+
+This report uses the latest *cleaned master linelist*.
+
+### Method
+
+The data preparation involves the following steps, detailed in the following
+tabs:
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc. The function `risk_calculator` is imported as an R
+object (`.rds`) from a separate report. It relies on the distribution of the
+*infectious period*, i.e. the delay between the *onset of symptom* of a source case
+and the *time at which they infect new secondary cases*. This is currently based
+on transmission chains from Butembo, but may need periodic updating.
+
+* **Add new variables**: addition of new variables to the VHF database, like top
+  affected health zones.
+
+* **Filter the data**: keep only relevant confirmed and probable cases, possibly
+  removing erroneous dates, for further analysis
+
+
+
+<!-- ======================================================= -->
+## Load scripts
+
+These scripts will load:
+
+* required packages
+* a few helper functions
+* a data-cleaning dictionary (`cleaning_rules`)
+* the path to current version of raw data (`current_data`)
+
+```{r read_scripts}
+
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$", full.names = TRUE)
+for (file in scripts_files) source(file)
+
+ggthemr("grape")
+
+```
+
+
+
+
+<!-- ======================================================= -->
+## Load / install *epirisk*
+
+This report requires a specific new RECON package called *epirisk*. It is not
+loaded as part of standard packages used in other reports, as only useful
+here. If this package is not installed on your computer, you need to install it
+using (this requires an internet connection):
+
+```{r install_epirisk, eval = FALSE}
+
+devtools::install_github("reconhub/epirisk")
+
+```
+
+Then we load the package using:
+
+```{r epirisk}
+
+library(epirisk)
+
+```
+
+
+
+
+<!-- ======================================================= -->
+## Import data
+
+We load clean **linelist** data:
+
+```{r load_data}
+
+## linelist dataset, clean
+current_clean_data
+linelist <- rio::import(current_clean_data) %>% 
+  as_tibble()
+
+```
+
+We also check that the **epi risk calculator** has been loaded:
+
+```{r load_risk_calculator}
+
+risk_calculator
+
+```
+
+
+
+<!-- ======================================================= -->
+## Completion date of the database
+
+```{r database_date}
+
+file_name <- gsub("^[^.]+/", "", current_clean_data)
+database_date <- file_name %>%
+  guess_dates()
+database_date
+
+```
+
+The **completion date** of the linelist database is 
+**`r format(database_date, format = "%A %d %B %Y")`**.
+All **analyses are done with respect to the date of completion** 
+(not the date at which the report was last compiled). 
+
+
+
+
+<!-- ======================================================= -->
+## Subset data
+
+We retain all the following subset of the data:
+
+* confirmed and probable cases
+* reported in the last 21 days
+
+```{r subset}
+
+last_21 <- database_date - 21
+last_21
+
+cases <- linelist %>%
+  filter(epicasedef %in% c("probable", "confirmed"),
+         date_report >= last_21)
+
+```
+
+
+
+
+<!-- ======================================================= -->
+## Custom colors
+
+We define custom color scales to be used in subsequent plots.
+
+```{r custom_colors}
+
+color_low <- "#d6d6c2"
+color_high <- "#999966"
+
+score_fill <- scale_fill_manual("Transmissibilité",
+                                 values = c(score_low = color_low,
+                                            score_high = color_high),
+                                 labels = c(score_low = "R = 1.1",
+                                            score_high = "R = 1.5"))
+
+score_colors <- scale_color_manual("Transmissibilité",
+                                   values = c(score_low = color_low,
+                                              score_high = color_high),
+                                   labels = c(score_low = "R = 1.1",
+                                              score_high = "R = 1.5"))
+
+```
+
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# The infection intensity {.tabset .tabset-fade .tabset-pills}
+
+<!-- ======================================================= -->
+## Method 
+
+The *infection intensity* is defined as the expected number of secondary cases
+infected over the last 21 days. This estimation relies on:
+
+* dates of *onset* and *isolation* of the recent cases (report/isolation within
+  last 21 days)
+  
+* the distribution of the delay from *onset* of a case and the *dates of
+  infection* of thei secondary cases
+
+* the average *reproduction number* (*R*) derived from recent transmission
+  chains; we also use, for comparison, an *R* of 1.5 approximately corresponding
+  to the infectivity in absence of vaccination
+
+
+```{r compute_scores}
+
+## compute scores with low / high R
+cases$score_low <- risk_calculator(
+    onset = cases$date_onset,
+    isolation = cases$date_report)
+
+cases$score_high <- risk_calculator(
+    onset = cases$date_onset,
+    isolation = cases$date_report,
+    R = 1.5)
+
+```
+
+
+<!-- ======================================================= -->
+## Infection intensity by health zone
+
+Here we compute and display the infection intensities by health zones by,
+through the following steps:
+
+1. compute scores by health zones and re-organise results by increasing values
+   of *R*
+   
+2. generate a plot
+
+3. generate a table displayed in the document, and later exported
+
+
+```{r scores_by_health_zone}
+
+## step 1
+scores_health_zone <- cases %>%
+  group_by(zone_de_sante) %>%
+  summarise(cases = n(),
+            score_low = round(sum(score_low, na.rm = TRUE), 2),
+            score_high = round(sum(score_high, na.rm = TRUE), 2)) %>%
+  arrange(desc(score_low)) %>%
+  gather(R, score, -(1:2)) %>%
+  mutate(R = factor(R, levels = c("score_low", "score_high")))
+  
+
+## step 2
+ggplot(scores_health_zone,
+       aes(x = zone_de_sante, y = score, fill = R)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_bw() +
+  large_txt + rotate_x_text(45) +
+  score_fill +
+  labs(title = "Intensité de transmission par zone de santé",
+       x = "",
+       y = "Estimation des cas secondaires générés \n lors des 3 dernières semaines")
+
+
+## step 3
+table_scores_health_zone <- scores_health_zone %>%
+  spread(R, score) %>% 
+  adorn_totals()
+
+table_scores_health_zone %>%
+  show_table()
+
+```
+
+
+
+
+
+<!-- ======================================================= -->
+## Infection intensity by health area
+
+```{r scores_by_health_area, fig.width = 10}
+
+## step 1
+scores_health_area <- cases %>%
+  group_by(zone_de_sante, aire_de_sante) %>%
+  summarise(cases = n(),
+            score_low = round(sum(score_low, na.rm = TRUE), 2),
+            score_high = round(sum(score_high, na.rm = TRUE), 2)) %>%
+  arrange(desc(score_low)) %>%
+  gather(R, score, -(1:3)) %>%
+  mutate(R = factor(R, levels = c("score_low", "score_high")))
+   
+
+## step 2
+ggplot(scores_health_area,
+       aes(x = aire_de_sante, y = score, fill = R)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_bw() +
+  large_txt +
+  rotate_x_text(45) +
+  score_fill +
+  facet_grid(. ~ zone_de_sante,
+             scale = "free", space = "free") +
+  custom_horiz_facet + 
+  labs(title = "Intensité de transmission par aire de santé active",
+       x = "",
+       y = "Estimation des cas secondaires générés \n lors des 3 dernières semaines")
+
+
+## step 3
+table_scores_health_area <- scores_health_area %>%
+  spread(R, score) %>% 
+  adorn_totals()
+
+table_scores_health_area %>%
+  show_table()
+
+```
+
+
+
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# Export outputs {.tabset .tabset-fade .tabset-pills}
+
+We export some of the relevant tables, which will be placed in the current
+working directory:
+
+```{r exports}
+
+if (!dir.exists("produced_xlsx")) {
+  dir.create("produced_xlsx")
+}
+
+
+to_export <- c("table_scores_health_zone",
+               "table_scores_health_area")
+
+for (e in to_export) {
+  rio::export(get(e),
+              file.path("produced_xlsx",
+                        paste0(e, Sys.Date(), ".xlsx")))
+}
+
+```
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# System information {.tabset .tabset-fade .tabset-pills}
+
+The following information documents the system on which the document was
+compiled.
+
+<!-- ======================================================= -->
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+<!-- ======================================================= -->
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+R.version
+```
+
+
+<!-- ======================================================= -->
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+sessionInfo()
+```
+
+
+
+
+<!-- ===================================================== -->
+## Compilation parameters
+
+This shows which parameters were passed through `params` at compilation time:
+
+```{r params}
+params
+```
+
+
+
+<!-- ===================================================== -->
+## Change log
+
+### Version 1.0.0
