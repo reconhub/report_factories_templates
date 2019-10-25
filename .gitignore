@@ -6,5 +6,5 @@
 inst/doc
 README.html
 revdep
-
 .Rproj.user
+.compile_log.rds
