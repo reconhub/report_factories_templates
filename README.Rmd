@@ -234,14 +234,17 @@ weak points. This will involve the following steps:
 
 
 <br>
+
 2. **read the main description** of the PR provided by the author on the
    *conversation tab*
    
 <br>
+
 3. **put yourself down as a reviewer** in the reviewer tab, if you are not
    listed there already
    
 <br>
+
 4. **examine the differences between files** on the '*Files changed*' tab; red
    lines indicated deletions, and green lines additions; note that these changes
    reflect all the commits of the PR; this part is particularly useful to flag
@@ -252,6 +255,7 @@ weak points. This will involve the following steps:
    review (including testing, see below)
    
 <br>
+
 5. **test** the changes on your computer:
 
 * get the new version on your computer using `git`:
