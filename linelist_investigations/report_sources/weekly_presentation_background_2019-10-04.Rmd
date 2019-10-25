@@ -1,0 +1,846 @@
+---
+title: "Weekly presentation background"
+author: "Thibaut Jombart, Christopher Jarvis and Patrick Keating for the epi analysis cell - EOC Goma"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: pygments
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+    toc_collapse: no
+    toc_depth: 2
+    toc_float: yes
+    css: !expr here::here('css', 'style.css')
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      collapse = TRUE,
+                      fig.width = 8,
+                      fig.height = 6,
+                      dpi = 150,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.path = "figures/")
+
+```
+
+
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This report produces the summary graphics and figures of the background slides of the weekly presentation
+
+### Data used
+
+This report uses the latest cleaned Master linelist data.
+
+### Method
+
+The data preparation involves the following steps, detailed in the following
+tabs:
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc.
+
+* **Add new variables**: addition of new variables to the Master linelist database, like top
+  affected health zones.
+
+* **Filter the data**: keep only relevant confirmed and probable cases, possibly
+  removing erroneous dates, for further analysis
+
+
+
+## Load scripts
+
+These scripts will load:
+
+* all local scripts, stored as `.R` filesinside `/scripts/`
+* all global scripts, i.e. stored outside the factory in `../scripts/`
+* the path to the cleaned MDC data stored as `x`
+
+```{r read_scripts}
+
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$", full.names=TRUE)
+for (file in scripts_files) source(file)
+
+ggthemr("grape")
+
+```
+
+
+
+## Load data
+
+We extract the completion date from the file name:
+
+```{r load_data}
+
+current_clean_data
+x <- rio::import(current_clean_data)
+
+file_name <- gsub("^[^.]+/", "", current_clean_data)
+database_date <- file_name %>%
+  guess_dates()
+database_date
+
+```
+
+The **completion date** of the database is **`r format(database_date, format =
+"%A %d %b %Y")`**.
+
+
+
+## Add new variables
+
+* We add a new variable `top_zones` which retains the top 7 health zones (with
+most cases since the beginning of the outbreak), and pool everything else into
+'others': 
+
+
+```{r add_new_variables}
+
+x <- x %>%
+  mutate(top_zones = top_values(zone_de_sante, 6))
+
+```
+
+
+## Filter data 
+
+We keep only data with:
+
+- `epicasedef`: `confirmed` and `probable`
+
+```{r filter}
+
+to_keep <- c("confirmed", "probable")
+
+x <- x %>%
+  filter(epicasedef %in% to_keep) %>% 
+  mutate(month= floor_date(date_report, "month")) 
+
+```
+
+
+# Plots for presentation {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This section produces the following graphs for the background to the presentation:  
+* epicurve by date notification and epicasedef  
+* epicurve by date notification and zone de sante (top zones)  
+* plot of number of aire de sante actives  
+* plot of proportion of cases unknown as contacts  
+* plot of proportion of décès communautaire  
+* plot of proportion of cases admitted to CTE that went within 3 days
+* Newly active zone de santé and newly active aire de sante.
+
+
+## Epicurves
+
+### Figure: epicurve by report and epicasedef
+
+```{r figure_report_epicasedef, fig.width = 10}
+
+i_report_epicasedef <- incidence(x$date_report, 7, groups = x$epicasedef)
+i_report_epicasedef
+
+plot(i_report_epicasedef, border = "white") +
+  scale_fill_discrete() +
+  rotate_x_text(45) +
+  scale_fill_discrete(name = "Statut du cas",
+                      breaks = c("confirmed", "probable"),
+                      labels = c("Confirmé","Probable")) +
+  large_txt +
+  theme(legend.title = element_blank(),
+        legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(
+            fill = "transparent",
+            color = "white"
+        )) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar date de notification"),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_x_date(breaks = "1 month", date_labels = "%d %b %Y")
+
+```
+
+### Figure: epicurve by community death
+
+```{r figure_report_commdeaths, fig.width = 10}
+
+i_report_comdeath <- incidence(x$date_report, 7, groups = x$type_death)
+i_report_comdeath
+
+plot(i_report_comdeath, border = "white") +
+  scale_fill_discrete() +
+  rotate_x_text(45) +
+  scale_fill_discrete(name = "Statut du cas",
+                      breaks = c("community_death", "non_community_death"),
+                      labels = c("Décèdes communitaire","Vivant ou non décèdes communitaire")) +
+  large_txt +
+  theme(legend.title = element_blank(),
+        legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(
+            fill = "transparent",
+            color = "white"
+        )) +
+  labs(title = paste0("Nombre de cas confirmés et probables",
+                     "\npar semaine de notification et des décèdes communitaires"),
+       x = "Semaine de notification",
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_x_date(breaks = "1 month", date_labels = "%d %b %Y")
+
+```
+
+
+### Figure: epicurve by selected Zone de sante
+```{r figure_report_commdeaths_zs, fig.width = 10}
+
+zs_select <- c("mambasa", "mandima", "mabalako", "beni", "kalunguta", "katwa", "butembo")
+
+x_comm_death_zs <- x %>%
+    filter(zone_de_sante %in% zs_select) %>%
+    select(epiweek_report_label, type_death, zone_de_sante) %>%
+    group_by(epiweek_report_label, zone_de_sante, type_death) %>%
+    tally()
+    
+x_comm_death_zs$zone_de_sante <- fct_relevel(x_comm_death_zs$zone_de_sante, c("mambasa", "mandima", "mabalako", "beni", "kalunguta", "katwa", "butembo"))
+
+x_comm_death_zs$type_death <- fct_relevel(x_comm_death_zs$type_death, c("Vivant", "Décèdes communitaire"))
+
+
+ggplot(x_comm_death_zs,
+       aes(x = epiweek_report_label, y = n, fill = type_death)) +
+  geom_bar(stat = "identity") +
+  facet_grid(zone_de_sante ~ .) +
+  rotate_x_text(45) +
+  large_txt +
+  # scale_fill_discrete(guide = FALSE) +
+  theme(legend.position = "bottom") +
+  labs(title = paste0("Nombre de cas confirmés et probables",
+                      "\npar semaine de notification et des décèdes communitaires"),
+       x = "Semaine de notification",
+       y = "Nombre de nouveaux cas par semaine") +
+   theme(strip.text.y = element_text(size = 12, angle = 0)) +
+  scale_x_date(breaks = "1 month", date_labels = "%d %b %Y") +
+  scale_fill_discrete(name = "", labels = c("Vivant", "Décèdes communitaire", "Non connu")) +
+  guides(fill = guide_legend())
+
+```
+
+
+### Table: weekly case counts by report and epicasedef
+
+```{r table_report_epicasedef}
+
+table_report_epicasedef <- i_report_epicasedef %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_epicasedef %>%
+  show_table()
+
+```
+
+
+
+### Figure: weekly case counts by major zone (variant)
+
+```{r figure_report_top_zones_variant, fig.width = 10, fig.height = 8}
+
+
+i_report_top_zones <- incidence(x$date_report, 7, groups = x$top_zones)
+
+
+df_report_top_zones <- as.data.frame(i_report_top_zones, long = TRUE)
+
+ggplot(df_report_top_zones,
+       aes(x = dates, y = counts, fill = groups)) +
+  geom_bar(stat = "identity") +
+  facet_grid(groups ~ .) +
+  rotate_x_text(45) +
+  large_txt +
+  scale_fill_discrete(guide = FALSE) +
+  theme(legend.position = "bottom") +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar date de début de notification"),
+       x = "",
+       y = "Nombre de nouveaux cas par semaine") +
+   theme(strip.text.y = element_text(size = 12, angle = 0)) +
+  scale_x_date(breaks = "1 month", date_labels = "%d %b %Y")
+
+```
+
+### Table: weekly case counts by major health zone
+
+```{r table_report_top_zones}
+
+table_report_top_zones <- i_report_top_zones %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_top_zones %>%
+  show_table()
+
+```
+
+## New health areas 21 days from the previous week. 
+
+```{r new_zs_as}
+
+# Match health areas with subcoordination
+aire_de_sante_info <-
+  x %>% 
+  group_by(aire_de_sante, sous_coordination) %>% 
+  count() %>% 
+  group_by(aire_de_sante) %>% 
+  top_n(1, n) %>%
+  select(-n)
+
+recent_week <- 
+  ifelse(
+    weekdays(database_date) %in% "Sunday", 
+    aweek::date2week(database_date, floor_day = TRUE), 
+    aweek::date2week(database_date - 7, floor_day = TRUE)
+  )
+
+start_week <-
+  (aweek::week2date(recent_week) - (7 * 5)) %>% 
+  aweek::date2week(floor_day = TRUE) %>% 
+  as.character()
+
+# count active health areas in recent week (previous 21 days including the last week)
+current_active <- 
+  x %>%
+  group_by(aire_de_sante) %>%
+  summarise(n_cases_21_days = sum(date_report > (aweek::week2date(recent_week) - 15))) %>% 
+  filter(n_cases_21_days > 0) %>% 
+  left_join(aire_de_sante_info)
+
+# Date of penultimate week
+penultimate_epiweek_1_date <- 
+  (recent_week %>% aweek::week2date() - 1)
+
+penultimate_week_active <- x %>%
+  group_by(aire_de_sante) %>%
+  filter(date_report > (aweek::week2date(recent_week) - 21) &  date_report < (aweek::week2date(recent_week))) %>% 
+  summarise(n_cases_21_days = sum(date_report > (aweek::week2date(penultimate_epiweek_1_date) - 21))) %>%
+  filter(n_cases_21_days > 0) %>% 
+  left_join(aire_de_sante_info)
+
+## New health areas
+new_as <- current_active[!current_active$aire_de_sante %in% penultimate_week_active$aire_de_sante ,]
+
+# Match zone de sante with subcoordination
+zone_de_sante_info <-
+  x %>% 
+  group_by(zone_de_sante, sous_coordination) %>% 
+  count() %>% 
+  group_by(zone_de_sante) %>% 
+  top_n(1, n) %>%
+  select(-n)
+
+# count active health zones in recent week (previous 21 days including the last week)
+current_active_zs <- 
+  x %>%
+  group_by(zone_de_sante) %>%
+  summarise(n_cases_21_days = sum(date_report > (aweek::week2date(recent_week) - 15))) %>%
+  filter(n_cases_21_days > 0) %>% 
+  left_join(zone_de_sante_info)
+
+penultimate_week_active_zs <- 
+  x %>%
+  group_by(zone_de_sante) %>%
+  filter(date_report < aweek::week2date(recent_week)) %>% 
+  summarise(n_cases_21_days = sum(date_report > (aweek::week2date(penultimate_epiweek_1_date) - 21))) %>%
+  filter(n_cases_21_days > 0) %>% 
+  left_join(zone_de_sante_info)
+
+
+## New health areas
+new_zn <- current_active_zs[!current_active_zs$zone_de_sante %in% penultimate_week_active_zs$zone_de_sante ,]
+new_zn$zone_de_sante
+
+
+# to calculate number of active health areas by sous coordination 
+current_active_za_for_number <- 
+  x %>%
+  filter(date_report > (aweek::week2date(recent_week) - 15))
+length(unique(current_active_za_for_number$aire_de_sante[current_active_za_for_number$sous_coordination == "beni"]))
+length(unique(current_active_za_for_number$aire_de_sante[current_active_za_for_number$sous_coordination == "butembo"]))
+length(unique(current_active_za_for_number$aire_de_sante[current_active_za_for_number$sous_coordination == "goma"]))
+length(unique(current_active_za_for_number$aire_de_sante[current_active_za_for_number$sous_coordination == "komanda"]))
+length(unique(current_active_za_for_number$aire_de_sante[current_active_za_for_number$sous_coordination == "mangina"]))
+
+# 
+# x %>%
+#   select(zone_de_sante, aire_de_sante) %>%
+#   filter(aire_de_sante %in% new_as_tbl) %>%
+#   group_by(zone_de_sante, aire_de_sante)
+#   
+ 
+```
+
+Total number of health areas affected across the entire course of the outbreak: `r length(unique(x$aire_de_sante))`
+
+Number of health areas reporting cases within the past 21 days: `r length(current_active$aire_de_sante)` 
+
+Health areas reporting cases within the past 21 days: `r current_active$aire_de_sante`
+
+New or reactivating health areas reporting cases within the week: `r new_as$aire_de_sante`
+
+Active health areas in the previous week: `r length(penultimate_week_active$aire_de_sante)`
+
+Total number of health zones affected across the entire course of the outbreak: `r length(unique(x$zone_de_sante))`
+
+Number of health zones reporting cases within the past 21 days: `r length(current_active_zs$zone_de_sante)`
+
+Health zones active reporting cases within the past 21 days: `r current_active_zs$zone_de_sante`
+
+New or reactivating health zones reporting cases within the week:`r new_zn$zone_de_sante`
+
+Health zones affected in previous week: `r length(penultimate_week_active_zs$zone_de_sante)`
+
+## Active health areas
+
+
+### Matching between health area and sub-coordination
+
+The correspondance between health areas and sub-coordination will be needed recover the sub-coordinations information after stratifying by health areas. We define the matching based on the most frequent correspondence between health areas and sub-coordinations.
+
+
+```{r health area sub coord}
+
+aire_de_sante_info <- x %>% 
+  group_by(aire_de_sante, sous_coordination) %>% 
+  count() %>% 
+  group_by(aire_de_sante) %>% 
+  top_n(1, n) %>%
+  select(-n)
+
+```
+
+### Computer incidence by health area
+
+Daily incidence is computed for health areas using `incidence`, and will later be converted to a `data.frame` for further analyses:
+
+```{r incidence by health area}
+
+inc <- with(x, incidence(date_report, groups = aire_de_sante))
+
+```
+
+
+### Figure:: active health areas per day (past 21 days)
+
+Here we compute the number of active health areas per day, for the entire time period of the data. Active areas are defined as health areas with at least 1 case within the last 21 days of the date considered. We do this by using the `rollsum` function, which computes the cumulative number of cases/aire de sante for a given time window (here, 21 days). Note that the argument `align = "right"` specifies that the time window, on a given day, should be in the past, not in the future. The argument `fill = NA` is also (weirdly) needed for this to work.
+
+
+```{r figure_active_health_areas}
+
+ggthemr("pale")
+
+inc_df <- as.data.frame(inc, long = TRUE) %>% 
+  rename(aire_de_sante = groups) %>% 
+  left_join(aire_de_sante_info) 
+
+timewindow <- 21
+
+nb_as_active <- inc_df %>%
+  group_by(aire_de_sante) %>%
+  mutate(
+      cases_last_21_days =zoo::rollsum(counts,
+                                   timewindow,
+                                   align = "right",
+                                   fill = NA),
+    has_cases = (cases_last_21_days > 0)
+     ) %>%
+  group_by(dates, sous_coordination) %>% 
+  summarise(n_active_areas = sum(has_cases))
+ 
+
+ggplot(nb_as_active) +
+  geom_col(aes(x = dates, y = n_active_areas,
+               fill = sous_coordination),
+           width = 1) +
+  labs(title = "Nombre d'aires de santé actives au cours du temps",
+       x = "",
+       y = paste("Nombre d'aires de santé avec au moins un cas",
+                 "notifié dans les 21 derniers jours",
+                 sep = "\n")) +
+  scale_x_date(date_breaks = "1 month") +
+  theme(legend.position = c(0.25, 0.85)) +
+  scale_fill_discrete("Sous-coordination") +
+  guides(fill = guide_legend(ncol = 2)) +
+  large_txt +
+  rotate_x_text(45)
+
+```
+
+## Analyses of proportion of cases unknown as contact, by week
+### Figure: proportion of cases unknown as contact, by week
+
+```{r figure_unknown_contacts_week}
+ggthemr("grape")
+
+tab_week <- 
+  x %>% 
+  group_by(epiweek_report,
+           epiweek_report_label,
+           contact_registered) %>% 
+  tally() %>% 
+  spread(contact_registered, n, fill = 0) %>%
+  mutate(total = no + yes,
+         p   = prop_to_perc(no / total),
+         lci = prop_ci(no, total, "lower", TRUE),
+         uci = prop_ci(no, total, "upper", TRUE))    
+
+## Overall
+ggplot(tab_week, aes(x = epiweek_report_label)) +
+  geom_ribbon(aes(ymin = lci, ymax = uci), alpha = 0.2) +
+  geom_point(aes(y = p)) +
+  geom_line(aes(y = p)) +
+  scale_y_continuous(limits = c(0, 100)) +
+  large_txt +
+  rotate_x_text(90)+
+  xlab("Semaine de notification") +
+  ylab("Proportion de cas") +
+  scale_x_date(date_breaks = "2 weeks", date_labels =  "%d %b") +
+  theme(axis.text.x = element_text(vjust = .5, angle = 90)) +
+  ggtitle("Proportion des cas non connus comme contact",
+          subtitle = 'avec intervalle de confiance à 95%')
+
+```
+
+### Table: proportion of cases unknown as contact, by week
+```{r table_proportion_cases_unknown_contact}
+
+tab_week %>% 
+  show_table()
+
+```
+
+
+## Deces communautaire proportion
+
+### Figure: Proportion of community deaths over time
+
+```{r fig_report_community_death_proportion}
+
+
+proportion_community_death <- x %>% 
+  group_by(epiweek_report_label, epiweek_report, type_death) %>% 
+  count() %>% 
+  spread(type_death, n, fill = 0) %>%
+  mutate(total = alive + community + etc_tc) %>%
+  mutate(prop_community_death = prop_to_perc(community / total),
+         lci_prop_community_death = prop_ci(community, total, "lower", TRUE),
+         uci_prop_community_death = prop_ci(community, total, "upper", TRUE)) %>%
+  select(epiweek_report,
+         prop_community_death,
+         lci_prop_community_death,
+         uci_prop_community_death,
+         everything())
+
+
+ggplot(proportion_community_death, 
+       aes(x = epiweek_report_label, y = prop_community_death)) +
+  geom_line(aes(x = epiweek_report_label, y = prop_community_death)) +
+  geom_ribbon(aes(x = epiweek_report_label, ymin = lci_prop_community_death, 
+                  ymax = uci_prop_community_death),
+              alpha = 0.25) +
+  ylim(0,100) +
+  rotate_x_text(45) +
+  scale_months +
+  large_txt +
+  labs(x = "",
+       y = "Pourcentage de décès communautaires",
+       title = paste("Décès communautaires parmi les cas confirmés et",
+                     "probables par semaine de notification",
+                     sep = "\n"))
+
+
+```
+
+### Table: Proportion of community deaths over time
+
+```{r table_report_community_death_proportion}
+
+table_proportion_community_death <- proportion_community_death %>%
+  as_tibble() %>%
+  select("Semaine de notification" = epiweek_report_label,
+         "Semaine épi" = epiweek_report,
+         "Décès communautaires" = community,
+         "Décès CTE ou CT" = etc_tc,
+         "Inconnu" = unknown,
+         "Total connu" = total,
+         "% décès communautaire" = prop_community_death,
+         "IC 95% inf" = lci_prop_community_death,
+         "IC 95% sup" = uci_prop_community_death)
+
+
+table_proportion_community_death %>% 
+  show_table()
+
+```
+
+
+
+## CTE admission within 3 days of onset
+### Figure: Proportion of cases admitted to CTE within 3 days of onset of symptoms
+
+```{r figure_proportion_cte_three_day_delay}
+
+#Calculate the proportion of cases with a delay of <=3 days from onset to admission to CTE
+
+
+proportion_delay_cte <- 
+  x %>% 
+  mutate(cte_delay = as.integer(date_admission - date_onset)) %>% 
+  mutate(month = floor_date(date_report, "month")) %>% 
+  filter(!is.na(date_onset),
+         !is.na(date_admission),
+         cte_delay >= 0) %>% 
+  mutate(cte_delay_group = case_when(
+    cte_delay >= 0 & cte_delay < 4 ~ "0-3",
+    cte_delay >=4 & cte_delay < 7 ~ "4-6",
+    cte_delay >= 7 & cte_delay < 10 ~ "7-9",
+    is.na(delay_admission) ~ "inconnu",
+    TRUE ~ ">=10"
+  )) %>% 
+  select(month, cte_delay_group) %>% 
+  group_by_all() %>% 
+  tally() %>% 
+  spread(cte_delay_group, n, fill = 0) %>% 
+  adorn_totals(c('col')) %>% 
+  mutate(prop_under3 = prop_to_perc(`0-3`/Total),
+         lci_prop_under3 = prop_ci(`0-3`, Total, "lower", TRUE),
+         uci_prop_under3 = prop_ci(`0-3`, Total, "upper", TRUE)) 
+  
+  
+  proportion_delay_cte_plot <- 
+  ggplot(proportion_delay_cte)+
+  geom_line(aes(x = month, y = prop_under3)) +
+  geom_ribbon(aes(x = month, ymin = lci_prop_under3, 
+                  ymax = uci_prop_under3),
+              alpha = 0.25) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %d %Y") +
+  rotate_x_text(45) +
+  labs(x = "Mois de notification", y = "Proportion", title = "Proportion des cas admis au CTE dans les 3 jours après la date \nde début de symptômes par mois de notification") +
+  ylim(0,100)
+
+
+proportion_delay_cte_plot
+
+
+```
+
+### Table: proportion of cases admitted to CTE within 3 days of onset of symptoms
+
+```{r table_proportion_cte_three_day_delay}
+
+proportion_delay_cte %>% 
+  show_table()
+
+```
+
+# Cases as contacts  {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+•	Proportion of new cases listed and followed as contacts in the past 21 days, compared to previous 21 days: xx%
+•	Proportion of new cases listed as contacts but not able to be followed as contacts in the past 21 days compared to previous 21 days: xx%
+
+
+## Proportion of new cases listed and followed as contacts in the past 21 days
+### Table: proportion of new cases listed and followed as contacts in the past 21 days
+
+```{r table_proportion_new_cases_listed_followed_recent21days}
+# NOTE THAT THIS IS A DUPLICATION OF WHAT'S IN THE WEEKLY CASES_UNKNOWN_CONTACT.RMD FILE 
+
+past21days <- database_date - 20
+
+
+number_cases_contacts_followed_past21days <- 
+  x %>% 
+  filter(contact_registered == "yes" & contact_surveilled == "yes") %>% 
+  filter(date_report >= past21days ) %>% 
+  select(contact_surveilled) %>% 
+  tally()
+
+
+number_cases_past21days <- 
+   x %>% 
+  filter(date_report >= past21days) %>% 
+  tally()
+
+
+prop_followed_past21days <- prop_to_perc(number_cases_contacts_followed_past21days/number_cases_past21days)
+
+prop_followed_past21days %>% 
+  show_table()
+
+```
+
+
+### Table: proportion of new cases listed and followed as contacts in the previous 21 days (i.e starting from one week earlier that current 21 days)
+
+```{r table_proportion_new_cases_listed_followed previous 21 days}
+
+
+enddate <- database_date - 7
+startdate <- database_date -27
+
+
+number_cases_contacts_followed_previous21days <- 
+  x %>% 
+  filter(contact_registered == "yes" & contact_surveilled == "yes") %>% 
+  filter(date_report >= startdate & date_report <= enddate) %>% 
+  select(contact_surveilled) %>% 
+  tally()
+
+
+number_cases_previous21days <- 
+   x %>% 
+  filter(date_report >= startdate & date_report <= enddate) %>% 
+  tally()
+
+
+prop_followed_previous21days <- prop_to_perc(number_cases_contacts_followed_previous21days/number_cases_previous21days)
+
+
+prop_followed_previous21days %>% 
+  show_table()
+
+```
+
+
+
+
+## Proportion of new cases listed and not followed up as contacts in the past 21 days
+### Table: proportion of new cases listed and not followed as contacts in the past 21 days
+
+```{r table_proportion_new_cases_not_followed_recent21days}
+
+past21days <- database_date - 20
+
+
+number_cases_contacts_not_followed_past21days <- 
+  x %>% 
+  filter(contact_registered == "yes" & contact_surveilled == "no") %>% 
+  filter(date_report >= past21days ) %>% 
+  select(contact_surveilled) %>% 
+  tally()
+
+
+number_cases_past21days <- 
+   x %>% 
+  filter(date_report >= past21days) %>% 
+  tally()
+
+
+prop_not_followed_past21days <- prop_to_perc(number_cases_contacts_not_followed_past21days/number_cases_past21days)
+
+prop_not_followed_past21days %>% 
+  show_table()
+
+```
+
+
+### Table: proportion of new cases listed and not followed as contacts in the previous 21 days (i.e starting from one week earlier that current 21 days)
+
+```{r table_proportion_new_cases_listed_not_followed previous 21 days}
+
+
+enddate <- database_date - 7
+startdate <- database_date -27
+
+
+number_cases_contacts_not_followed_previous21days <- 
+  x %>% 
+  filter(contact_registered == "yes" & contact_surveilled == "no") %>% 
+  filter(date_report >= startdate & date_report <= enddate) %>% 
+  select(contact_surveilled) %>% 
+  tally()
+
+
+number_cases_previous21days <- 
+   x %>% 
+  filter(date_report >= startdate & date_report <= enddate) %>% 
+  tally()
+
+
+prop_not_followed_previous21days <- prop_to_perc(number_cases_contacts_not_followed_previous21days/number_cases_previous21days)
+
+
+prop_not_followed_previous21days %>% 
+  show_table()
+
+```
+
+# Export tables {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+We export the various tables produced in this report to excel files saved in a
+folder `produced_xlsx`.
+
+## Excel files
+
+```{r exports, eval = FALSE, include = FALSE}
+
+if (!dir.exists("produced_xlsx")) {
+  dir.create("produced_xlsx")
+}
+
+```
+
+
+
+
+
+
+
+
+# System information {.tabset .tabset-fade .tabset-pills}
+
+The following information documents the system on which the document was
+compiled.
+
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+R.version
+```
+
+
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+sessionInfo()
+```
