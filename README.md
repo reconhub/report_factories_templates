@@ -246,6 +246,7 @@ weak points. This will involve the following steps:
    review (including testing, see below)
    
 5. **test** the changes on your computer:
+
     a. get the new version on your computer using `git`:
 
 
@@ -255,6 +256,7 @@ git fetch
 
 ## create a local branch matching that of the PR, and move to it
 git checkout xxx
+   
 ```
 
 where `xxx` should be the name of the branch of the PR.
