@@ -166,16 +166,19 @@ Reports include:
 
 * `age_sex`: age-sex pyramids, stratified by geographic units and in time
 
-* `temporal_trends`: trends of various proportions in time, with some
-  geographical stratifications, including
-    + proportions of community death
-    + proportions of cases known as contacts
-
 * `epicurves`: epicurves with various stratifications, by case characteristics
   and by geographic units
 
 * `kpi`: key performance indicators, used for general summaries of the state of
   the response
+
+* `temporal_trends`: trends of various proportions in time, with some
+  geographical stratifications, including
+    + proportions of community death
+    + proportions of cases known as contacts
+
+* `transmission_intensity`: estimation of transission intensity by active health
+  zones and health areas
 
 * `weekly_presentation_background`: summaries used for weekly presentations of
   epidemic situation updates
