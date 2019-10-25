@@ -247,7 +247,7 @@ weak points. This will involve the following steps:
    
 5. **test** the changes on your computer:
 
-    a. get the new version on your computer using `git`:
+    + get the new version on your computer using `git`:
 
 
 ```bash
@@ -261,14 +261,14 @@ git checkout xxx
 
 where `xxx` should be the name of the branch of the PR.
 
-    b. make sure the data needed for the report are present at the right place
+    + make sure the data needed for the report are present at the right place
     in your `data` folder; for `aaa_clean_data`, this will be a raw `xlsx`
     master linelist file in `data/raw`; for other reports, this will be the
     cleaned `rds` data in `data/clean/`, accompanied by a script in
     `scripts/current_clean_data.R` pointing to the right file (generated
     automatically when `aaa_clean_data` is compiled
 
-    c. compile the report by opening the `open.Rproj` file in the root of the factory, and typing:
+    + compile the report by opening the `open.Rproj` file in the root of the factory, and typing:
 	
 
 ```r
@@ -277,11 +277,14 @@ reportfactory::compile_report("report_name_date.Rmd", clean_report_sources = TRU
 
 where `"report_name_date.Rmd"` is the name and date of the report changed.
 
-    d. if the compilation is successful, check the output produced in `report_outputs/report_name_date/...`; go back to the review page on github and complete your review according to your observations
+    + if the compilation is successful, check the output produced in `report_outputs/report_name_date/...`; go back to the review page on github and complete your review according to your observations
 	
 
 6. when your review is finished, conclude it by clicking on '**Review changes**'
    as illustrated below; possible decisions are:
+
+
+<img src="images/pr_final.png" alt="example of PR page">
 
     + **approve**: all is good, or all changes requested in previous stages of
       the review have been made; this will enable merging the PR into the
@@ -294,7 +297,5 @@ where `"report_name_date.Rmd"` is the name and date of the report changed.
     + **comments**: most reviews will either lead to approval or to requesting
       changes; only use this if neither applies (maybe for questions /
       conversational items)
-
-<img src="images/pr_final.png" alt="example of PR page">
 
 
