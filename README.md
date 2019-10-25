@@ -18,6 +18,7 @@ remotes::install_github("reconhub/reportfactory")
 ```
 
 
+
 <br>
 
 <!-- ========================================== -->
@@ -73,6 +74,62 @@ where `xxx` is a character string uniquely present in the type of data to use.
 
 
 
+
+<br>
+
+<!-- ========================================== -->
+## *alerts*: analyses of alerts from the Ebola North Kivu analytics cell
+
+### Outline
+
+This factory contains several reports providing analyses of alerts used
+routinely by the analytics cell of the Ebola response based in the Emergency
+Operation Center, North Kivu, DRC. Every sub-coordination having a different
+data structure, they each have a dedicated report, which essentially differs in
+terms of data cleaning, but reproduces the same analyses as much as possible.
+
+Note that as data are confidential, these are not shared here. Reports are meant
+to work with the original alerts files, and will need some adaptations for other
+data.
+
+Reports include:
+
+* `alerts_goma`: report for the Goma sub-coordination
+
+
+
+### How to use it?
+
+Clone or [download](https://github.com/reconhub/report_factories_templates/archive/master.zip) the factory, make sure the **reportfactory** is installed, then:
+
+1. put the alerts data in `xlsx` format in `alerts/data/raw`, formatted as
+   `alerts_xxx_date.xlsx`, where:
+    + `xxx` indicates a sub-coordination, in lower case (goma, beni, butembo,
+      komanda, mambasa, mangina)
+    + `date` follows the `yyyy-mm-dd` format
+
+2. open **R** in the root factory folder or simply double-click on the
+   `open.Rproj` file
+   
+3. (first time only) install dependencies by typing:
+
+
+```r
+reportfactory::install_deps()
+```
+
+4. run the factory by typing:
+
+
+```r
+reportfactory::update_reports(clean_report_sources = TRUE)
+```
+
+
+
+
+
+
 <br>
 
 <!-- ========================================== -->
@@ -112,7 +169,39 @@ Reports include:
 * `kpi`: key performance indicators, used for general summaries of the state of
   the response
 
+* `weekly_presentation_background`: summaries used for weekly presentations of
+  epidemic situation updates
 
+
+
+
+### How to use it?
+
+Clone or [download](https://github.com/reconhub/report_factories_templates/archive/master.zip) the factory, make sure the **reportfactory** is installed, then:
+
+1. for `aaa_clean_linelist`, put the master linelist in `xlsx` format in in
+   `data/raw`, named as `master_linelist_yyyy-mm-dd.xlsx`; for other reports,
+   make sure the `aaa_clean_linelist` report has been run at least once - this
+   will produce a clean `rds` dataset in `data/clean` and a script in
+   `scripts/current_clean_data.R` pointing to the right file, so that any report
+   using clean data will use the latest clean data available in the factory
+
+2. open **R** in the root factory folder or simply double-click on the
+   `open.Rproj` file
+   
+3. (first time only) install dependencies by typing:
+
+
+```r
+reportfactory::install_deps()
+```
+
+4. run the factory by typing:
+
+
+```r
+reportfactory::update_reports(clean_report_sources = TRUE)
+```
 
 
 
