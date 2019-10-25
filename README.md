@@ -230,12 +230,16 @@ weak points. This will involve the following steps:
    
 <img src="images/pr_illustrated.png" alt="example of PR page">
 
+
+<br>
 2. **read the main description** of the PR provided by the author on the
    *conversation tab*
    
+<br>
 3. **put yourself down as a reviewer** in the reviewer tab, if you are not
    listed there already
    
+<br>
 4. **examine the differences between files** on the '*Files changed*' tab; red
    lines indicated deletions, and green lines additions; note that these changes
    reflect all the commits of the PR; this part is particularly useful to flag
@@ -245,6 +249,7 @@ weak points. This will involve the following steps:
    you can use to *start a review*; leave this page open until you finish the
    review (including testing, see below)
    
+<br>
 5. **test** the changes on your computer:
 
 * get the new version on your computer using `git`:
@@ -283,22 +288,23 @@ where `"report_name_date.Rmd"` is the name and date of the report changed.
   and complete your review according to your observations
 	
 
-* when your review is finished, conclude it by clicking on '**Review changes**'
-  as illustrated below; possible decisions are:
+
+<br> 6. **Final decision**: when your review is finished, conclude it by clicking on
+  '**Review changes**' as illustrated below; possible decisions are:
 
 
 <img src="images/pr_final.png" alt="example of PR page">
 
-    + **approve**: all is good, or all changes requested in previous stages of
-      the review have been made; this will enable merging the PR into the
-      *master* branch
+* **approve**: all is good, or all changes requested in previous stages of the
+      review have been made; this will enable merging the PR into the *master*
+      branch
 
-    + **request changes**: some changes are needed, either to fix issues,
-      improve code or explanations, fine-tune graphics, etc.; it is not uncommon
-      to request changes several times before approving a final version
+* **request changes**: some changes are needed, either to fix issues, improve
+      code or explanations, fine-tune graphics, etc.; it is not uncommon to
+      request changes several times before approving a final version
 	  
-    + **comments**: most reviews will either lead to approval or to requesting
-      changes; only use this if neither applies (maybe for questions /
-      conversational items)
+* **comments**: most reviews will either lead to approval or to requesting
+  changes; only use this if neither applies (maybe for questions /
+  conversational items)
 
 
