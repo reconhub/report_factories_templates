@@ -228,7 +228,7 @@ weak points. This will involve the following steps:
    the PR; or you may just volonteer to perform a review to address an existing
    [issue](issues); the landing page should ressemble the image below:
    
-<img src="images/pr_illustrated.png" alt="example of PR page">
+<img src="images/pr_illustrated.png" alt="example of PR page" style="-webkit-filter: drop-shadow(5px 5px 5px #222); filter: drop-shadow(5px 5px 5px #222);">
 
 
 <br>
