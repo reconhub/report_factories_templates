@@ -247,7 +247,7 @@ weak points. This will involve the following steps:
    
 5. **test** the changes on your computer:
 
-    + get the new version on your computer using `git`:
+    1. get the new version on your computer using `git`:
 
 
 ```bash
@@ -268,7 +268,7 @@ file in `data/raw`; for other reports, this will be the cleaned `rds` data in
 pointing to the right file (generated automatically when `aaa_clean_data` is
 compiled
 
-    + compile the report by opening the `open.Rproj` file in the root of the
+    2. compile the report by opening the `open.Rproj` file in the root of the
 factory, and typing:
 	
 
