@@ -1,5 +1,8 @@
 
 
+<!-- ========================================== -->
+<!-- ========================================== -->
+<!-- ========================================== -->
 # Welcome to the *reportfactory* templates repository
 
 This repository provides a collection of self-contained *report factories*, to
@@ -19,6 +22,7 @@ remotes::install_github("reconhub/reportfactory")
 
 <br>
 
+<!-- ========================================== -->
 ## *compare_data*: compare dataset updates
 
 ### Outline
@@ -72,9 +76,11 @@ reportfactory::update_reports(clean_report_sources = TRUE, params(type = "xxx"))
 where `xxx` is a character string uniquely present in the type of data to use.
 
 
+
+
 <br>
 
-
+<!-- ========================================== -->
 ## *linelist_investigations*: analyses from the Ebola North Kivu analytics cell
 
 ### Outline
@@ -118,6 +124,9 @@ Reports include:
 
 <br>
 
+<!-- ========================================== -->
+<!-- ========================================== -->
+<!-- ========================================== -->
 # Contributing
 
 Contributions are welcome via pull requests against the *master* branch of the
@@ -125,21 +134,28 @@ project. Pushing directly to *master* has been disabled. Please follow the
 guidelines below for contributions.
 
 
+<!-- ========================================== -->
 ## Types of contributions
 
 Types of contributions include:
 
-* submitting new reports
+1. submitting **new reports**
 
-* amending existing reports
+2. **amending** existing reports
 
-* acting as a reviewer for pull requests
+3. **reviewing** reports sent through pull requests
 
-All contributors, including reviewers, should be duely acknowledged on the
-document they contributed to.
+Fundamentally, 1 and 2 are treated the same way and will undergo the same
+workflow. Task 3 (reviewing) is slightly different, and described in a separate
+section.
+
+**All contributors, including reviewers, should be duely acknowledged on the
+document they contributed to.**
 
 
-## How to contribute
+
+<!-- ========================================== -->
+## Submitting new reports or changes
 
 First, **make sure you have read the guidelines** for writing analysis reports,
 which you can download from <a
@@ -181,3 +197,102 @@ git commit -a -m "some short description of changes"
    will be merged into *master* and become the **new official version** of the
    report; this will need to be copied to the *pcloud* infrastructure, and used
    until a new version is made using the process described here.
+
+
+<!-- ========================================== -->
+## Revewing changes
+
+As for writing reports, you need to be familiar with **the guidelines for writing analysis reports**,
+which you can download from <a
+href="https://github.com/reconhub/guides/raw/master/golden_rules.html.zip"
+download="golden_rules.html.zip" target="_blank">here</a>. To discuss or amend
+these guidelines, see the corresponding [project on
+github](https://github.com/reconhub/guides).
+
+
+Reviews form the cornerstone of a robust workflow, and constitute essential
+contributions to the analysis work. Therefore, they are duely acknowledged onto
+the reports themselves. In this section, we briefly outline the steps of a
+review, and provide some guidelines on how to perform reviews.
+
+
+### Workflow
+
+Changes to reports (including the creation of new reports) are submitted via
+[Pull Requests (PR)](pulls) by the authors. A PR basically proposes to merge
+change made on a separate, dedicated branch onto the reference branch
+*master*. As a reviewer, your task is to give your opinion on whether these
+changes should integrate the *master* branch, and make suggestions to improve
+weak points. This will involve the following steps:
+
+1. **open the PR on the github website**; you might have been suggested as a
+   reviewer, in which case you receive an email notification with a link to open
+   the PR; or you may just volonteer to perform a review to address an existing
+   [issue](issues); the landing page should ressemble the image below:
+   
+<img src="images/pr_illustrated.png" alt="example of PR page">
+
+2. **read the main description** of the PR provided by the author on the
+   *conversation tab*
+   
+3. **put yourself down as a reviewer** in the reviewer tab, if you are not
+   listed there already
+   
+4. **examine the differences between files** on the '*Files changed*' tab; red
+   lines indicated deletions, and green lines additions; note that these changes
+   reflect all the commits of the PR; this part is particularly useful to flag
+   accidental deletions and get an idea of large sections added; this is also
+   the place where you can **write your review** and **comment on sections of
+   the code** - clicking on any given line will open a new comment box, which
+   you can use to *start a review*; leave this page open until you finish the
+   review (including testing, see below)
+   
+5. **test** the changes on your computer:
+    a. get the new version on your computer using `git`:
+
+```{bash, eval = FALSE}
+## update all remote branches, including the one of the PR
+git fetch
+
+## create a local branch matching that of the PR, and move to it
+git checkout xxx
+```
+
+where `xxx` should be the name of the branch of the PR.
+
+    b. make sure the data needed for the report are present at the right place
+    in your `data` folder; for `aaa_clean_data`, this will be a raw `xlsx`
+    master linelist file in `data/raw`; for other reports, this will be the
+    cleaned `rds` data in `data/clean/`, accompanied by a script in
+    `scripts/current_clean_data.R` pointing to the right file (generated
+    automatically when `aaa_clean_data` is compiled
+
+    c. compile the report by opening the `open.Rproj` file in the root of the factory, and typing:
+	
+```{r compile_expl, eval = FALSE}
+reportfactory::compile_report("report_name_date.Rmd", clean_report_sources = TRUE)
+```
+
+where `"report_name_date.Rmd"` is the name and date of the report changed.
+
+    d. if the compilation is successful, check the output produced in `report_outputs/report_name_date/...`; go back to the review page on github and complete your review according to your observations
+	
+
+6. when your review is finished, conclude it by clicking on '**Review changes**'
+   as illustrated below; possible decisions are:
+
+    + **approve**: all is good, or all changes requested in previous stages of
+      the review have been made; this will enable merging the PR into the
+      *master* branch
+
+    + **request changes**: some changes are needed, either to fix issues,
+      improve code or explanations, fine-tune graphics, etc.; it is not uncommon
+      to request changes several times before approving a final version
+	  
+    + **comments**: most reviews will either lead to approval or to requesting
+      changes; only use this if neither applies (maybe for questions /
+      conversational items)
+
+<img src="images/pr_final.png" alt="example of PR page">
+
+
