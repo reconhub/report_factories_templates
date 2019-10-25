@@ -216,6 +216,9 @@ reportfactory::update_reports(clean_report_sources = TRUE)
 
 <br>
 
+***************************
+***************************
+
 <!-- ========================================== -->
 <!-- ========================================== -->
 <!-- ========================================== -->
@@ -224,6 +227,7 @@ reportfactory::update_reports(clean_report_sources = TRUE)
 Contributions are welcome via pull requests against the *master* branch of the
 project. Pushing directly to *master* has been disabled. Please follow the
 guidelines below for contributions.
+
 
 
 <!-- ========================================== -->
@@ -246,6 +250,7 @@ document they contributed to.**
 
 
 
+***************************
 <!-- ========================================== -->
 ## Submitting new reports or changes
 
@@ -293,6 +298,7 @@ git commit -a -m "some short description of changes"
    until a new version is made using the process described here.
 
 
+***************************
 <!-- ========================================== -->
 ## Revewing changes
 
