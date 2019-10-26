@@ -282,7 +282,7 @@ fits_3 <- !fits_1 & !fits_2 & has_fever & has_3_symptoms
 
 
 ## make sure criteria are exclusive - no number in the table below should exceed
-## 1
+## 1. i.e this table should only zero or one as categories.
 table(fits_1 + fits_2 + fits_3)
 
 ## expected decisions
@@ -402,6 +402,15 @@ scale_decisions <- scale_fill_manual(
                true_negative = "vrai négatif",
                false_positive = "faux positif",
                false_negative = "faux négatif"))
+
+scale_validations <- scale_fill_manual(
+    "Outcome",
+    values = c(statut_inconnu = "#BCB4A4", 
+               validee = "#D56F3E", 
+               invalidee = "#F2C69B"),
+    labels = c(validee = "Validée", 
+               invalidee = "Invalidée", 
+               statut_inconnu = "Statut Inconnu"))
 
 ```
 
