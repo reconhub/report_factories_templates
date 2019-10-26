@@ -229,7 +229,7 @@ x <- x %>%
 x <- x %>% 
   mutate(top_zones = top_values(zone_de_sante, 5)) %>%
   mutate(top_aires = top_values(aire_de_sante, 14))
-
+```
 
 One last round of dictionary-based cleaning:
 
