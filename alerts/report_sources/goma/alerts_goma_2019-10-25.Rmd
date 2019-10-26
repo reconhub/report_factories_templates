@@ -262,7 +262,21 @@ fits_2 <- !fits_1 & has_bleeding
 ## criteria 3
 has_fever <- outcomes$fievre == "oui"
 has_3_symptoms <- outcomes %>%
-  select(nausee_vom:hoquet) %>% # hoq is the col before bleeding
+    select(nausee_vom,
+         diarrhee,
+         fatigue,
+         anorexie,
+         dlr_abdo,
+         dlr_thorax,
+         dlr_muscu,
+         dlr_artic,
+         cephalee,
+         toux,
+         dyspnee,
+         dysphagie,
+         odynophagie,
+         hoquet,
+         bleed) %>% 
   apply(1, function(e) sum(e == "oui", na.rm = TRUE)) >= 3
 fits_3 <- !fits_1 & !fits_2 & has_fever & has_3_symptoms
 
