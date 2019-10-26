@@ -1,6 +1,6 @@
 ---
 title: "Investigation of alerts data: Goma"
-author: "Thibaut Jombart, Flavio Finger, Christopher Jarvis for the analytic cell OEC Goma"
+author: "Thibaut Jombart, Flavio Finger, Christopher Jarvis, Charlie Whittaker for the analytic cell OEC Goma"
 date: "`r format(Sys.time(), '%A %d %B %Y')`"
 output:
   html_document:
@@ -180,6 +180,9 @@ x$origin %>% unique
 x <- mutate(x, bleed = saignements)
 table(x$bleed, useNA = "ifany")
 
+## aire_de_sante
+x <- mutate(x, aire_de_sante = aire_sante)
+
 
 ## contact connu
 x <- mutate(x, contact_connu = lien_epi)
@@ -188,7 +191,35 @@ table(x$contact_connu, useNA = "ifany")
 
 ```
 
+## Variable Creation
 
+The following variables are created: 
+- `bleed` - which describes whether the alert displayed any of the bleeding related
+symptoms.
+- `epiweek_report` & `epiweek_report_label` - which describe the epiweek the alert
+was reported in.
+- `top_zones` - which describes the 3 most active Zone de Santes (other Zone de 
+Santes) are grouped into "other".
+- `top_aires` - which describes the 14 most active Aire de Santes (out of all the
+legitimate Aire de Santes belonging to Beni present in the database). Note - All 
+other Aire de Santes are aggregated into the category "other".
+
+Note - All other Aire de Santes are aggregated into the category "other".
+
+``` {r variable_creation}
+
+## epiweek report
+x <- x %>%
+  mutate(epiweek_report = 
+           aweek::date2week(date, week_start = "Monday", floor_day = TRUE)) %>%
+  mutate(epiweek_report_label = 
+           aweek::week2date(date, week_start = "Monday", floor_day = TRUE)) 
+
+x <- x %>% 
+  mutate(top_zones = top_values(zone_de_sante, 3)) %>%
+  mutate(top_aires = top_values(aire_de_sante, 14))
+
+```
 One last round of dictionary-based cleaning:
 
 ```{r last_cleaning}
@@ -440,6 +471,8 @@ This section summarises alerts according to the following criteria:
 * decisions by health zone
 * decisions in time
 
+Note: The Top 3 Health Zones and all Valid Aire de Santes that have reported alerts at any point are plotted when considering totals by geographical area (aggregated over time). The Top 3 Health Zones and the Top 14 Aire de Santes are plotted when it comes to plotting over time (due to space constraints).
+
 
 
 <!-- ======================================================= -->
@@ -465,11 +498,69 @@ table_overall <- x %>%
   adorn_totals()
 
 table_overall %>%
-  knitr::kable()
+  show_table()
 
 ```
 
+##  Validation status zone de sante
 
+```{r overall_valid}
+
+ggplot(x, aes(x = zone_de_sante, fill = status)) +
+  geom_bar(col = "white") +
+  scale_x_discrete(drop = FALSE) +
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes",
+       title = paste0("Nombre d'alertes par statut de validation et\n zone de santé")) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom")
+
+table_validation_zs <- x %>%
+  group_by(zone_de_sante, status) %>%
+  summarise(count = n()) %>%
+  complete(status) %>%
+  spread(status, count, fill = 0) %>%
+  adorn_totals(where = c("row", "col"))
+
+table_validation_zs %>%
+  show_table()
+
+```
+
+##  Validation status aire de sante
+
+```{r overall_valid_as}
+x_top_zones <- x %>% 
+  filter(top_zones != "other")
+
+ggplot(x_top_zones , aes(x = aire_de_sante, fill = status)) +
+  geom_bar(col = "white") +
+  scale_x_discrete(drop = TRUE) +
+  scale_validations + 
+    facet_grid(. ~ top_zones, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes",
+       title = 
+         "Nombre d'alertes par statut de validation et\n aire de santé") +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom") 
+
+table_validation_as <- x %>%
+  group_by(zone_de_sante, aire_de_sante, status) %>%
+  summarise(count = n()) %>%
+  complete(status) %>%
+  spread(status, count, fill = 0) %>%
+  adorn_totals(where = c("row", "col"))
+
+table_validation_as %>%
+  show_table()
+
+```
 
 
 <!-- ======================================================= -->
