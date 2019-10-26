@@ -74,20 +74,6 @@ ggthemr("fresh")
 
 ```
 
-## Load population data
-
-We load in population data for each Aire/Zone de Sante. 
-
-```{r load_population_data}
-
-# ## load the data
-# pop_data <- rio::import(path_to_geog_pop)
-# glimpse(pop_data)
-# 
-# path_to_geog_pop
-
-```
-
 ## Load alerts data
 
 We extract the completion date from the file name:
@@ -136,13 +122,6 @@ x <- x_raw %>%
              wordlists = cleaning_rules) %>%
   as_tibble()
 
-# REVIEW: Original encoding caused an error in clean_data function (on U.S. mac) 
-# pop_data <- pop_data %>% mutate_if(is.character, enc2utf8)
-# pop_data <- pop_data %>%
-#   clean_data(guess_dates = FALSE,
-#              wordlists = cleaning_rules) %>%
-#   as_tibble()
-  
 ```
 
 
@@ -182,7 +161,7 @@ x <- mutate(x, aire_de_sante = as.character(aire_sante))
 table(x$aire_de_sante, useNA = "ifany")
 
 ## origin / source_notif
-x <- mutate(x, origin = origine_alerte)
+x <- mutate(x, origin = type_surveillance)
 table(x$origin, useNA = "ifany")
 
 # create variable for alert validation
@@ -246,36 +225,11 @@ x <- x %>%
            aweek::week2date(date, week_start = "Monday", floor_day = TRUE)) 
 
 
-## top zones and top aire de santes
-# belong_to_goma <- pop_data$sous_coordination == "goma"
-# goma_ha <- pop_data$aire_de_sante[belong_to_goma]
-# goma_hz <- unique(pop_data$zone_de_sante[belong_to_goma])
-# aires_to_keep <- x$zone_de_sante %in% goma_hz & x$aire_de_sante %in% goma_ha
 
 x <- x %>% 
   mutate(top_zones = top_values(zone_de_sante, 5)) %>%
   mutate(top_aires = top_values(aire_de_sante, 14))
 
-## aire de sante population
-# aire_de_sante_pop <- pop_data %>%
-#   mutate(as_population = population) %>%
-#   select(zone_de_sante, aire_de_sante, as_population)
-# 
-# ## zone de sante population
-# zone_de_sante_pop <- pop_data %>%
-#   group_by(zone_de_sante) %>%
-#   summarise(zs_population = sum(population, na.rm = TRUE))
-# 
-# pop_goma_areas <- pop_data$population[belong_to_goma]
-# total_population <- sum(unique(pop_goma_areas), na.rm = TRUE)
-# 
-# ## adding populations to main data
-# x <- x %>%
-#   left_join(aire_de_sante_pop, by = c("aire_de_sante", "zone_de_sante")) %>%
-#   left_join(zone_de_sante_pop, by = c("zone_de_sante")) %>% 
-#   mutate(total_population = total_population)
-
-```
 
 One last round of dictionary-based cleaning:
 
@@ -285,33 +239,6 @@ x <- x %>%
   clean_variable_spelling(wordlists = cleaning_rules)
 
 ```
-
-
-## Check Population Linkage (Review Regularly)
-
-``` {r check_population_linkage}
-
-# # Calculating number of individuals successfully linked to population data
-# number_individuals <- nrow(x)
-# goma_aires <- x$aire_de_sante %in% goma_ha
-# number_individuals_aire_linked <- length(x$aire_de_sante[goma_aires])
-# prop_linked <- sum(number_individuals_aire_linked / number_individuals)
-# 
-# # Compare these two quantities - ensure there aren't any mispellings we're missing
-# table(x$aire_de_sante[!number_individuals]) # aire de santes in database we're not matching
-# goma_ha # master list of aire de santes in Mambasa
-# 
-# # Identifying Aire de Santes with missing population data
-# goma_ha_pop <- pop_data$population[belong_to_goma]
-# index <- which(is.na(goma_ha_pop))
-# non_pop_data <- goma_ha[index]
-# 
-# # Identifying number of alerts linked to Aire de Sante with 
-# # missing population data
-# alerts_no_pop <- sum(x$aire_de_sante == non_pop_data)
-
-```
-
 
 
 ## Outcomes
@@ -635,6 +562,7 @@ ggplot(x_validations, aes(x = top_zones, y = count, fill = status)) +
 ### Table - Total Since Database Start  
 
 ```{r health_zone_total_table, fig.keep = "all"}
+
 table_hz_total_validation <- x %>%
   group_by(top_zones, status) %>%
   summarise(count = n()) %>%
@@ -669,6 +597,7 @@ ggplot(x, aes(x = date, fill = status)) +
 ### Table - Weekly Since Database Start
 
 ```{r health_zone_time_table, fig.keep = "all"}
+
 table_hz_over_time_validation <- x %>%
   group_by(epiweek_report, top_zones, status) %>%
   summarise(count = n()) %>%
@@ -744,6 +673,7 @@ ggplot(x_recent, aes(x = date, fill = status)) +
 ### Table - Daily Past 3 Weeks 
 
 ```{r health_zone_time_recent_table, fig.width = 12, fig.height = 5}
+
 table_hz_over_time_recent_validation <- x_recent %>%
   group_by(date, top_zones, status) %>%
   summarise(count = n()) %>%
@@ -853,8 +783,6 @@ table_ha_over_time_validation %>%
 ``` {r health_area_total_recent, fig.width = 14}
 
 x_validations <- x %>%
-  # filter(zone_de_sante %in% goma_hz) %>%
-  # filter(aire_de_sante %in% goma_ha) %>%
   filter(date > database_date - 21) %>%
   group_by(status, zone_de_sante, aire_de_sante) %>%
   summarise(count = n()) 
@@ -1195,8 +1123,6 @@ table_hz_over_time_recent_origins %>%
 ``` {r health_area_total_origins, fig.width = 14}
 
 x_origins <- x %>%
-  # filter(aire_de_sante %in% goma_ha) %>%
-  # filter(zone_de_sante %in% goma_hz) %>%
   group_by(origin, zone_de_sante, aire_de_sante) %>%
   summarise(count = n()) 
 
@@ -1285,8 +1211,6 @@ table_ha_over_time_origins %>%
 ``` {r health_area_total_recent_origin, fig.width = 14}
 
 x_origins <- x %>%
-  # filter(aire_de_sante %in% goma_ha) %>%
-  # filter(zone_de_sante %in% goma_hz) %>%
   filter(date > database_date - 21) %>%
   group_by(origin, zone_de_sante, aire_de_sante) %>%
   summarise(count = n()) 
@@ -1675,8 +1599,6 @@ table_hz_over_time_recent_decisions %>%
 ``` {r health_area_total_decisions, fig.width = 14}
 
 x_decisions <- outcomes %>%
-  # filter(aire_de_sante %in% goma_ha) %>%
-  # filter(zone_de_sante %in% goma_hz) %>%
   group_by(decision_comparison, zone_de_sante, aire_de_sante) %>%
   summarise(count = n()) 
 
@@ -1767,8 +1689,6 @@ table_ha_over_time_decisions %>%
 ``` {r health_area_total_recent_decision, fig.width = 14}
 
 x_decisions <- outcomes %>%
-  # filter(aire_de_sante %in% goma_ha) %>%
-  # filter(zone_de_sante %in% goma_hz) %>%
   filter(date > database_date - 21) %>%
   group_by(decision_comparison, zone_de_sante, aire_de_sante) %>%
   summarise(count = n()) 
