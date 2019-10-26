@@ -236,7 +236,22 @@ variable which asserts these conditions:
 ## criteria 1
 has_contact <- outcomes$contact_connu %in% c("confirme", "oui")
 has_one_symptom <- outcomes %>%
-  select(fievre:bleed) %>%
+  select(fievre,
+         nausee_vom,
+         diarrhee,
+         fatigue,
+         anorexie,
+         dlr_abdo,
+         dlr_thorax,
+         dlr_muscu,
+         dlr_artic,
+         cephalee,
+         toux,
+         dyspnee,
+         dysphagie,
+         odynophagie,
+         hoquet,
+         bleed) %>%
   apply(1, function(e) any(e == "oui", na.rm = TRUE))
 fits_1 <- has_contact & has_one_symptom
 
