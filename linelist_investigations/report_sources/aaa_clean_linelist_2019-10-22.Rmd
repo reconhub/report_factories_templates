@@ -182,18 +182,18 @@ x <- x_raw %>%
   mutate(date_exposure_start = date_contact_confirmed_case1) %>% 
   mutate(date_exposure_end = enddate1_contact_confirmed) %>%
   mutate(date_vacc = vacc_date) %>%
-  mutate(date_hosp1_start = hosp1_start) %>%
-  mutate(date_hosp2_start = hosp2_start) %>%
-  mutate(date_hosp3_start = hosp3_start) %>%
-  mutate(date_hosp4_start = hosp4_start) %>%
-  mutate(date_hosp5_start = hosp5_start) %>%
-  mutate(date_hosp6_start = hosp6_start) %>%
-  mutate(date_hosp1_end = hosp1_end) %>%
-  mutate(date_hosp2_end = hosp2_end) %>%
-  mutate(date_hosp3_end = hosp3_end) %>%
-  mutate(date_hosp4_end = hosp4_end) %>%
-  mutate(date_hosp5_end = hosp5_end) %>%
-  mutate(date_hosp6_end = hosp6_end) %>%
+  # mutate(date_hosp1_start = hosp1_start) %>%
+  # mutate(date_hosp2_start = hosp2_start) %>%
+  # mutate(date_hosp3_start = hosp3_start) %>%
+  # mutate(date_hosp4_start = hosp4_start) %>%
+  # mutate(date_hosp5_start = hosp5_start) %>%
+  # mutate(date_hosp6_start = hosp6_start) %>%
+  # mutate(date_hosp1_end = hosp1_end) %>%
+  # mutate(date_hosp2_end = hosp2_end) %>%
+  # mutate(date_hosp3_end = hosp3_end) %>%
+  # mutate(date_hosp4_end = hosp4_end) %>%
+  # mutate(date_hosp5_end = hosp5_end) %>%
+  # mutate(date_hosp6_end = hosp6_end) %>%
   mutate(current_status = final_outcome) %>%
   mutate(report_status = statusreport_mdc) %>% 
   mutate(outcome = final_outcome) %>% 
@@ -214,7 +214,11 @@ x <- x_raw %>%
   mutate(month_report = floor_date(date_report, unit = "month"),
          month_onset = floor_date(date_onset, unit = "month")) %>% 
   mutate(transmission_place_group = transmission_place) %>%
-  mutate(place_death_crude = place_of_death)
+  mutate(place_death_crude = case_when(
+                    current_status == "died" ~ place_of_death,
+                    current_status == "alive" ~ "alive",
+                    current_status == "survived" ~ "alive",
+                    TRUE ~ "unknown"))
 
 ```
 
@@ -243,7 +247,8 @@ As the MLL comes from Google Spreadsheet, it will implicitely use the
 x <- x %>% 
   mutate_at(
       vars(starts_with("date_")),
-      guess_dates, origin = as.Date("1899-12-30"))
+      guess_dates, origin = as.Date("1899-12-30"),
+      error_tolerance = 0.1)
 
 
 ```
