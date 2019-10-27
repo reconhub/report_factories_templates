@@ -187,8 +187,6 @@ symptoms.
 was reported in.
 - `top_zones` - which describes the 3 most active Zone de Santes (other Zone de 
 Santes) are grouped into "other".
-- `as_population`, `hz_population` and `total_population` - which describe the 
-population of the Aire de Sante, Zone de Sante and Sous-Coordination respectively.
 - `top_aires` - which describes the 14 most active Aire de Santes (out of all the
 legitimate Aire de Santes belonging to Goma present in the database). Note - All 
 other Aire de Santes are aggregated into the category "other".
