@@ -319,7 +319,7 @@ Values of the variable `type_death` will be defined as:
 * `alive` for alive patients
 * `unknown` in other situations (unknown outcomes)
 
-``` {r type_death} 
+```{r type_death} 
 
 table(x$type_death, useNA = "ifany")
 
@@ -327,7 +327,7 @@ x <- x %>%
   mutate(type_death =
            case_when(
                ## commu. death condition 1
-               place_death_crude == "community" ~ "community",
+               str_detect(place_death_crude, "community") ~ "community",
                ##  commu. death condition 2
                report_status == "dead" &
                place_death_crude == "unknown" &
