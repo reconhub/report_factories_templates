@@ -445,11 +445,7 @@ We add the duration of hospitalisation:
 
 ## rename dates of death and discharge
 x <- x %>%
-      # delay_outcome = as.integer(date_outcome - date_onset),
       mutate(delay_admission = as.integer(cte_date - date_onset))
-      ## duration_hospitalisation = as.integer(
-      ##     date_outcome - date_admission),
-      ## documented_hospitalisation = !is.na(date_admission)
   
 
 ```
@@ -473,10 +469,7 @@ x <- x %>%
          date_onset,
          date_report,
          date_admission,
-         ## date_outcome,
-         ## date_discharge,
          date_death,
-         ## date_outcome,
          date_exposure_start,
          date_exposure_end,
          province,
@@ -486,9 +479,6 @@ x <- x %>%
          age,
          age_class,
          hcw,
-         ## delay_outcome,
-         ## duration_hospitalisation,
-         ## documented_hospitalisation,
          everything())
 
 ```
