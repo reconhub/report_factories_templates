@@ -691,14 +691,12 @@ table_hz_over_time_recent_validation %>%
 ``` {r health_area_total, fig.width = 14}
 
 x_validations <- x %>%
-  # filter(zone_de_sante %in% goma_hz) %>%
-  # filter(aire_de_sante %in% goma_ha) %>%
   group_by(status, zone_de_sante, aire_de_sante) %>%
   summarise(count = n())
 
 x_validations %>% 
   filter(count >= 100) %>% 
-ggplot(aes(x = aire_de_sante, y = count, fill = status)) +
+  ggplot(aes(x = aire_de_sante, y = count, fill = status)) +
   geom_col() +
   scale_x_discrete(drop = FALSE) +
   scale_validations +
@@ -740,8 +738,7 @@ x_validations <- x %>%
   group_by(epiweek_report_label, status, top_aires) %>%
   summarise(count = n())
 
-x_validations %>% 
-ggplot(aes(x = epiweek_report_label, y = count, fill = status)) +
+ggplot(x_validations, aes(x = epiweek_report_label, y = count, fill = status)) +
   geom_col() +
   facet_wrap( ~ top_aires) +
   scale_validations + 
@@ -787,7 +784,7 @@ x_validations <- x %>%
 
 x_validations %>% 
   filter(count >= 20) %>% 
-ggplot(aes(x = aire_de_sante, y = count, fill = status)) +
+  ggplot(aes(x = aire_de_sante, y = count, fill = status)) +
   geom_col() +
   scale_x_discrete(drop = FALSE) +
   scale_validations +
@@ -1126,7 +1123,7 @@ x_origins <- x %>%
 
 x_origins %>% 
   filter(count >= 100) %>% 
-ggplot(aes(x = aire_de_sante, y = count, fill = origin)) +
+  ggplot(aes(x = aire_de_sante, y = count, fill = origin)) +
   geom_col() +
   scale_x_discrete(drop = FALSE) +
   scale_origins +
@@ -1215,7 +1212,7 @@ x_origins <- x %>%
 
 x_origins %>% 
   filter(count >= 20) %>% 
-ggplot(aes(x = aire_de_sante, y = count, fill = origin)) +
+  ggplot(aes(x = aire_de_sante, y = count, fill = origin)) +
   geom_col() +
   scale_x_discrete(drop = FALSE) +
   scale_origins +
@@ -1524,8 +1521,8 @@ x_decisions_recent <- outcomes_recent %>%
   group_by(decision_comparison, top_zones) %>%
   summarise(count = n())
 
-ggplot(x_decisions_recent, aes(x = top_zones, y = count, 
-                               fill = decision_comparison)) +
+ggplot(x_decisions_recent, 
+       aes(x = top_zones, y = count, fill = decision_comparison)) +
   geom_col() +
   scale_x_discrete(drop = FALSE) +
   scale_decisions +
