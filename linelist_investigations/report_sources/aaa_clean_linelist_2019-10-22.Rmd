@@ -38,9 +38,9 @@ knitr::opts_chunk$set(echo = TRUE,
   
   **Data contributors:**
   
-  **Version:** 2.0.0
+  **Version:** 2.0.1
   
-  **Reviewed by:** Amy Gimma
+  **Reviewed by:** 
 </div>
 
 
