@@ -240,7 +240,7 @@ x <- x %>%
 
 Remove data from before 2019-01-01 as not as reliable. 
 
-```{r last_cleaning}
+```{r remove_pre_2019}
 
 x <- x %>%
   filter(date >= "2019-01-01")
@@ -466,10 +466,8 @@ ggplot(x, aes(x = date, fill = status)) +
 ```{r sous_coord_time_table, fig.keep = "all"}
 
 table_validation_overall_time <- x %>%
-  group_by(epiweek_report, status) %>%
-  summarise(count = n()) %>%
-  complete(status) %>%
-  spread(status, count, fill = 0) %>%
+  count(epiweek_report, status) %>%
+  spread(status, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_validation_overall_time %>%
@@ -501,10 +499,8 @@ ggplot(x_recent, aes(x = date, fill = status)) +
 ```{r sous_coord_recent_table, fig.keep = "all"}
 
 table_validation_overall_past_3_weeks <- x_recent %>%
-  group_by(date, status) %>%
-  summarise(count = n()) %>%
-  complete(status) %>%
-  spread(status, count, fill = 0) %>%
+  count(date, status) %>%
+  spread(status, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_validation_overall_past_3_weeks %>%
@@ -517,9 +513,8 @@ table_validation_overall_past_3_weeks %>%
 ```{r sous_co_proportion_validated}
 
 x_prop <- x %>%
-  group_by(epiweek_report_label, status) %>%
-  summarise(count = n()) %>%
-  spread(status, count, fill = 0) %>% 
+  count(epiweek_report_label, status) %>%
+  spread(status, n, fill = 0) %>% 
   mutate(total = invalidee + validee,
          p   = prop_to_perc(validee / total),
          lci = prop_ci(validee, total, "lower", TRUE),
@@ -549,12 +544,8 @@ ggplot(x_prop, aes(x = epiweek_report_label, col = "#D56F3E")) +
 
 ``` {r health_zone_total}
 
-x_validations <- x %>%
-  group_by(status, top_zones) %>%
-  summarise(count = n())
-
-ggplot(x_validations, aes(x = top_zones, y = count, fill = status)) +
-  geom_col() +
+ggplot(x, aes(x = top_zones, fill = status)) +
+  geom_bar() +
   scale_x_discrete(drop = FALSE) +
   scale_validations +
   labs(x = "",
@@ -571,10 +562,8 @@ ggplot(x_validations, aes(x = top_zones, y = count, fill = status)) +
 ```{r health_zone_total_table, fig.keep = "all"}
 
 table_hz_total_validation <- x %>%
-  group_by(top_zones, status) %>%
-  summarise(count = n()) %>%
-  complete(status) %>%
-  spread(status, count, fill = 0) %>% 
+  count(top_zones, status) %>%
+  spread(status, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_hz_total_validation %>%
@@ -606,10 +595,8 @@ ggplot(x, aes(x = date, fill = status)) +
 ```{r health_zone_time_table, fig.keep = "all"}
 
 table_hz_over_time_validation <- x %>%
-  group_by(epiweek_report, top_zones, status) %>%
-  summarise(count = n()) %>%
-  complete(status, nesting(epiweek_report, top_zones), fill = list(count = 0)) %>%
-  spread(status, count, fill = 0) %>%
+  count(epiweek_report, top_zones, status) %>%
+  spread(status, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_hz_over_time_validation %>%
@@ -624,17 +611,14 @@ table_hz_over_time_validation %>%
 
 ``` {r health_zone_total_recent}
 
-x_validations_recent <- x_recent %>%
-  group_by(status, top_zones) %>%
-  summarise(count = n())
-
-ggplot(x_validations_recent, aes(x = top_zones, y = count, fill = status)) +
-  geom_col() +
+ggplot(x_recent, aes(x = top_zones, fill = status)) +
+  geom_bar() +
   scale_x_discrete(drop = FALSE) +
   scale_validations +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = paste("Nombre d'alertes par statut de validation et \nzone de santé",
+       title = paste("Nombre d'alertes par statut de validation",
+                      "et \nzone de santé",
                      " depuis les 3 semaines dernières")) +
   theme(legend.position = "bottom") +
   large_txt 
@@ -646,10 +630,8 @@ ggplot(x_validations_recent, aes(x = top_zones, y = count, fill = status)) +
 ```{r health_zone_total_recent_table, fig.keep = "all"}
 
 table_hz_total_recent_validation <- x_recent %>%
-  group_by(top_zones, status) %>%
-  summarise(count = n()) %>%
-  complete(status) %>%
-  spread(status, count, fill = 0) %>% 
+  count(top_zones, status) %>%
+  spread(status, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_hz_total_recent_validation %>%
@@ -682,10 +664,8 @@ ggplot(x_recent, aes(x = date, fill = status)) +
 ```{r health_zone_time_recent_table, fig.width = 12, fig.height = 5}
 
 table_hz_over_time_recent_validation <- x_recent %>%
-  group_by(date, top_zones, status) %>%
-  summarise(count = n()) %>%
-  complete(status) %>%
-  spread(status, count, fill = 0) %>%
+  count(date, top_zones, status) %>%
+  spread(status, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_hz_over_time_recent_validation %>%
@@ -697,15 +677,15 @@ table_hz_over_time_recent_validation %>%
 
 ### Total since database start
 
-``` {r health_area_total, fig.width = 14}
+Areas with less than 100 alerts removed from graph but kept in table. 
+
+```{r health_area_total, fig.width = 14}
 
 x_validations <- x %>%
-  group_by(status, zone_de_sante, aire_de_sante) %>%
-  summarise(count = n())
+  count(status, zone_de_sante, aire_de_sante) %>%
+  filter(n >= 100)
 
-x_validations %>% 
-  filter(count >= 100) %>% 
-  ggplot(aes(x = aire_de_sante, y = count, fill = status)) +
+ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
   geom_col() +
   scale_x_discrete(drop = FALSE) +
   scale_validations +
@@ -728,10 +708,8 @@ x_validations %>%
 ```{r health_area_total_table, fig.keep = "all"}
 
 table_ha_total_validation <- x %>%
-  group_by(aire_de_sante, status) %>%
-  summarise(count = n()) %>%
-  complete(status) %>%
-  spread(status, count, fill = 0) %>% 
+  count(aire_de_sante, status) %>%
+  spread(status, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_ha_total_validation %>%
@@ -743,12 +721,8 @@ table_ha_total_validation %>%
 
 ```{r health_area_time, fig.width = 12, fig.height = 8}
 
-x_validations <- x %>%
-  group_by(epiweek_report_label, status, top_aires) %>%
-  summarise(count = n())
-
-ggplot(x_validations, aes(x = epiweek_report_label, y = count, fill = status)) +
-  geom_col() +
+ggplot(x, aes(x = epiweek_report_label, fill = status)) +
+  geom_bar() +
   facet_wrap( ~ top_aires) +
   scale_validations + 
   labs(x = "",
@@ -767,10 +741,8 @@ ggplot(x_validations, aes(x = epiweek_report_label, y = count, fill = status)) +
 ```{r health_area_time_table_validation_status, fig.keep = "all"}
 
 table_ha_over_time_validation <- x %>%
-  group_by(epiweek_report, top_aires, status) %>%
-  summarise(count = n()) %>%
-  complete(status) %>%
-  spread(status, count, fill = 0) %>%
+  count(epiweek_report, top_aires, status) %>%
+  spread(status, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_ha_over_time_validation %>%
@@ -788,12 +760,11 @@ table_ha_over_time_validation %>%
 
 x_validations <- x %>%
   filter(date > database_date - 21) %>%
-  group_by(status, zone_de_sante, aire_de_sante) %>%
-  summarise(count = n()) 
+  count(status, zone_de_sante, aire_de_sante) %>%
+  filter(n >= 20)
 
-x_validations %>% 
-  filter(count >= 20) %>% 
-  ggplot(aes(x = aire_de_sante, y = count, fill = status)) +
+
+ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
   geom_col() +
   scale_x_discrete(drop = FALSE) +
   scale_validations +
@@ -819,10 +790,8 @@ x_validations %>%
 
 table_ha_total_recent_validation <- x %>%
   filter(date > database_date - 21) %>%
-  group_by(aire_de_sante, status) %>%
-  summarise(count = n()) %>%
-  complete(status) %>%
-  spread(status, count, fill = 0) %>% 
+  count(aire_de_sante, status) %>%
+  spread(status, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_ha_total_recent_validation %>%
@@ -837,10 +806,9 @@ table_ha_total_recent_validation %>%
 x_validations <- x %>%
   filter(date > database_date - 21) %>%
   filter(top_aires != "other") %>%
-  group_by(date, status, top_aires) %>%
-  summarise(count = n())
+  count(date, status, top_aires)
 
-ggplot(x_validations, aes(x = date, y = count, fill = status)) +
+ggplot(x_validations, aes(x = date, y = n, fill = status)) +
   geom_col() +
   facet_wrap( ~ top_aires) +
   scale_validations + 
@@ -862,10 +830,8 @@ ggplot(x_validations, aes(x = date, y = count, fill = status)) +
 
 table_ha_over_time_recent_validation <- x %>%
   filter(date > database_date - 21) %>%
-  group_by(date, top_aires, status) %>%
-  summarise(count = n()) %>%
-  complete(status) %>%
-  spread(status, count, fill = 0) %>%
+  count(date, top_aires, status) %>%
+  spread(status, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_ha_over_time_recent_validation %>%
@@ -893,12 +859,8 @@ This section summarises alerts over time according to their origin
 
 ```{r sous_coord_origins}
 
-x_origins <- x %>%
-  group_by(epiweek_report_label, origin) %>%
-  summarise(count = n())
-
-ggplot(x_origins, aes(x = epiweek_report_label, y = count, fill = origin)) +
-  geom_col() +
+ggplot(x, aes(x = epiweek_report_label, fill = origin)) +
+  geom_bar() +
   scale_x_discrete(drop = FALSE) +
   scale_origins +
   guides(fill = guide_legend(ncol = 2)) +
@@ -917,10 +879,8 @@ ggplot(x_origins, aes(x = epiweek_report_label, y = count, fill = origin)) +
 ```{r sous_coord_time_table_origins, fig.keep = "all"}
 
 table_origins <- x %>%
-  group_by(epiweek_report, origin) %>%
-  summarise(count = n()) %>%
-  complete(origin) %>%
-  spread(origin, count, fill = 0) %>%
+  count(epiweek_report, origin) %>%
+  spread(origin, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_origins %>%
@@ -934,9 +894,7 @@ table_origins %>%
 
 ```{r origins_time_recent}
 
-x_recent_origins <- x_recent 
-
-ggplot(x_recent_origins, aes(x = date, fill = origin)) +
+ggplot(x_recent, aes(x = date, fill = origin)) +
   geom_histogram(binwidth = 1, col = "white") +
   theme(strip.text.y = element_text(size = 12, angle = 0)) +
   scale_months +
@@ -958,10 +916,8 @@ ggplot(x_recent_origins, aes(x = date, fill = origin)) +
 ```{r sous_coord_time_table_origins_alerts_recent, fig.keep = "all"}
 
 table_origins_recent <- x_recent %>%
-  group_by(date, origin) %>%
-  summarise(count = n()) %>%
-  complete(origin) %>%
-  spread(origin, count, fill = 0) %>%
+  count(date, origin) %>%
+  spread(origin, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_origins_recent %>%
@@ -975,12 +931,8 @@ table_origins_recent %>%
 
 ``` {r health_zone_total_origin}
 
-x_origins <- x %>%
-  group_by(origin, top_zones) %>%
-  summarise(count = n())
-
-ggplot(x_origins, aes(x = top_zones, y = count, fill = origin)) +
-  geom_col() +
+ggplot(x, aes(x = top_zones, fill = origin)) +
+  geom_bar() +
   scale_x_discrete(drop = FALSE) +
   scale_origins +
   guides(fill = guide_legend(ncol = 2)) +
@@ -998,10 +950,8 @@ ggplot(x_origins, aes(x = top_zones, y = count, fill = origin)) +
 ```{r health_zone_total_table_origin, fig.keep = "all"}
 
 table_hz_total_origins <- x %>%
-  group_by(top_zones, origin) %>%
-  summarise(count = n()) %>%
-  complete(origin) %>%
-  spread(origin, count, fill = 0) %>% 
+  count(top_zones, origin) %>%
+  spread(origin, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_hz_total_origins %>%
@@ -1033,10 +983,8 @@ ggplot(x, aes(x = date, fill = origin)) +
 ```{r health_zone_time_table_origin, fig.keep = "all"}
 
 table_hz_over_time_origins <- x %>%
-  group_by(epiweek_report, top_zones, origin) %>%
-  summarise(count = n()) %>%
-  complete(origin) %>%
-  spread(origin, count, fill = 0) %>%
+  count(epiweek_report, top_zones, origin) %>%
+  spread(origin, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_hz_over_time_origins %>%
@@ -1050,12 +998,8 @@ table_hz_over_time_origins %>%
 
 ``` {r health_zone_total_recent_origin_recent}
 
-x_origins_recent <- x_recent %>%
-  group_by(origin, top_zones) %>%
-  summarise(count = n())
-
-ggplot(x_origins_recent, aes(x = top_zones, y = count, fill = origin)) +
-  geom_col() +
+ggplot(x_recent, aes(x = top_zones, fill = origin)) +
+  geom_bar() +
   scale_x_discrete(drop = FALSE) +
   scale_origins +
   guides(fill = guide_legend(ncol = 2)) +
@@ -1073,10 +1017,8 @@ ggplot(x_origins_recent, aes(x = top_zones, y = count, fill = origin)) +
 ```{r health_zone_total_recent_table_origins, fig.keep = "all"}
 
 table_hz_total_recent_origins <- x_recent %>%
-  group_by(top_zones, origin) %>%
-  summarise(count = n()) %>%
-  complete(origin) %>%
-  spread(origin, count, fill = 0) %>% 
+  count(top_zones, origin) %>%
+  spread(origin, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_hz_total_recent_origins %>%
@@ -1109,10 +1051,8 @@ ggplot(x_recent, aes(x = date, fill = origin)) +
 ```{r health_zone_time_recent_table_origins, fig.width = 12, fig.height = 5}
 
 table_hz_over_time_recent_origins <- x_recent %>%
-  group_by(date, top_zones, origin) %>%
-  summarise(count = n()) %>%
-  complete(origin) %>%
-  spread(origin, count, fill = 0) %>%
+  count(date, top_zones, origin) %>%
+  spread(origin, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_hz_over_time_recent_origins %>%
@@ -1127,12 +1067,11 @@ table_hz_over_time_recent_origins %>%
 ``` {r health_area_total_origins, fig.width = 14}
 
 x_origins <- x %>%
-  group_by(origin, zone_de_sante, aire_de_sante) %>%
-  summarise(count = n()) 
+  count(origin, zone_de_sante, aire_de_sante) %>%
+  filter(n >= 100) 
 
-x_origins %>% 
-  filter(count >= 100) %>% 
-  ggplot(aes(x = aire_de_sante, y = count, fill = origin)) +
+
+ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
   geom_col() +
   scale_x_discrete(drop = FALSE) +
   scale_origins +
@@ -1156,10 +1095,8 @@ x_origins %>%
 ```{r health_area_total_table_origins, fig.keep = "all"}
 
 table_ha_total_origins <- x %>%
-  group_by(aire_de_sante, origin) %>%
-  summarise(count = n()) %>%
-  complete(origin) %>%
-  spread(origin, count, fill = 0) %>% 
+  count(aire_de_sante, origin) %>%
+  spread(origin, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_ha_total_origins %>%
@@ -1172,12 +1109,10 @@ table_ha_total_origins %>%
 ```{r health_area_time_origin, fig.width = 12, fig.height = 8}
 
 x_origins <- x %>%
-  filter(top_aires != "other") %>%
-  group_by(epiweek_report_label, origin, top_aires) %>%
-  summarise(count = n())
+  filter(top_aires != "other") 
 
-ggplot(x_origins, aes(x = epiweek_report_label, y = count, fill = origin)) +
-  geom_col() +
+ggplot(x_origins, aes(x = epiweek_report_label, fill = origin)) +
+  geom_bar() +
   facet_wrap( ~ top_aires) +
   scale_origins + 
   labs(x = "",
@@ -1196,10 +1131,8 @@ ggplot(x_origins, aes(x = epiweek_report_label, y = count, fill = origin)) +
 ```{r health_area_time_table_origin, fig.keep = "all"}
 
 table_ha_over_time_origins <- x %>%
-  group_by(epiweek_report, top_aires, origin) %>%
-  summarise(count = n()) %>%
-  complete(origin) %>%
-  spread(origin, count, fill = 0) %>%
+  count(epiweek_report, top_aires, origin) %>%
+  spread(origin, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_ha_over_time_origins %>%
@@ -1216,12 +1149,10 @@ table_ha_over_time_origins %>%
 
 x_origins <- x %>%
   filter(date > database_date - 21) %>%
-  group_by(origin, zone_de_sante, aire_de_sante) %>%
-  summarise(count = n()) 
+  count(origin, zone_de_sante, aire_de_sante) %>%
+  filter(n >= 20)
 
-x_origins %>% 
-  filter(count >= 20) %>% 
-  ggplot(aes(x = aire_de_sante, y = count, fill = origin)) +
+ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
   geom_col() +
   scale_x_discrete(drop = FALSE) +
   scale_origins +
@@ -1246,10 +1177,8 @@ x_origins %>%
 ```{r health_area_total_recent_table_origin, fig.keep = "all"}
 
 table_ha_total_recent_origins <- x %>%
-  group_by(aire_de_sante, origin) %>%
-  summarise(count = n()) %>%
-  complete(origin) %>%
-  spread(origin, count, fill = 0) %>% 
+  count(aire_de_sante, origin) %>%
+  spread(origin, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_ha_total_recent_origins %>%
@@ -1264,10 +1193,9 @@ table_ha_total_recent_origins %>%
 x_origins_recent <- x %>%
   filter(top_aires != "other") %>%
   filter(date > database_date - 21) %>%
-  group_by(date, origin, top_aires) %>%
-  summarise(count = n())
+  count(date, origin, top_aires) 
 
-ggplot(x_origins_recent, aes(x = date, y = count, fill = origin)) +
+ggplot(x_origins_recent, aes(x = date, y = n, fill = origin)) +
   geom_col() +
   facet_wrap( ~ top_aires) +
   scale_origins + 
@@ -1289,10 +1217,8 @@ ggplot(x_origins_recent, aes(x = date, y = count, fill = origin)) +
 
 table_ha_over_time_recent_origins <- x %>%
   filter(date > database_date - 21) %>%
-  group_by(date, top_aires, origin) %>%
-  summarise(count = n()) %>%
-  complete(origin) %>%
-  spread(origin, count, fill = 0) %>%
+  count(date, top_aires, origin) %>%
+  spread(origin, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_ha_over_time_recent_origins %>%
@@ -1352,9 +1278,8 @@ ggplot(outcomes, aes(x = epiweek_report_label, fill = decision_comparison)) +
 ``` {r table_decisions}
 
 table_decisions <- outcomes %>%
-  group_by(epiweek_report, decision_comparison) %>%
-  summarise(count = n()) %>%
-  spread(decision_comparison, count, fill = 0) %>% 
+  count(epiweek_report, decision_comparison) %>%
+  spread(decision_comparison, n, fill = 0) %>% 
   adorn_totals(c("row", "col")) %>%
   mutate(prop_false_positive_95ci =   
            prop_to_display_ci(false_positive, Total, dec = 2, perc = TRUE),
@@ -1388,9 +1313,8 @@ table_decisions %>%
 ```{r sens_spec}
 
 table_sens_spec <- outcomes %>%
-  group_by(top_zones, decision_comparison) %>%
-  summarise(count = n()) %>%
-  spread(decision_comparison, count, fill = 0) %>% 
+  count(top_zones, decision_comparison) %>%
+  spread(decision_comparison, n, fill = 0) %>% 
   mutate(total_tested = true_positive + false_positive,
          total_not_tested = true_negative + false_negative) %>% 
   mutate(incorrectly_validated_95ci = 
@@ -1434,9 +1358,8 @@ ggplot(outcomes_recent, aes(x = date, fill = decision_comparison)) +
 
 ``` {r decisions_over_time}
 
-table_decisions_recent <- incidence(
-  outcomes_recent$date, "day", 
-  groups = outcomes_recent$decision_comparison) %>%
+table_decisions_recent <- incidence(outcomes_recent$date, "day", 
+                            groups = outcomes_recent$decision_comparison) %>%
   as.data.frame() %>%
   adorn_totals(where = c("row", "col"))
 
@@ -1452,12 +1375,8 @@ table_decisions_recent %>%
 
 ``` {r health_zone_total_decision}
 
-x_decisions <- outcomes %>%
-  group_by(decision_comparison, top_zones) %>%
-  summarise(count = n())
-
-ggplot(x_decisions, aes(x = top_zones, y = count, fill = decision_comparison)) +
-  geom_col() +
+ggplot(outcomes, aes(x = top_zones, fill = decision_comparison)) +
+  geom_bar() +
   scale_x_discrete(drop = FALSE) +
   scale_decisions +
   labs(x = "",
@@ -1474,10 +1393,8 @@ ggplot(x_decisions, aes(x = top_zones, y = count, fill = decision_comparison)) +
 ```{r health_zone_total_table_decision, fig.keep = "all"}
 
 table_hz_total_decisions <- outcomes %>%
-  group_by(top_zones, decision_comparison) %>%
-  summarise(count = n()) %>%
-  complete(decision_comparison) %>%
-  spread(decision_comparison, count, fill = 0) %>% 
+  count(top_zones, decision_comparison) %>%
+  spread(decision_comparison, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_hz_total_decisions %>%
@@ -1509,10 +1426,8 @@ ggplot(outcomes, aes(x = date, fill = decision_comparison)) +
 ```{r health_zone_time_table_decision, fig.keep = "all"}
 
 table_hz_over_time_decisions <- outcomes %>%
-  group_by(epiweek_report, top_zones, decision_comparison) %>%
-  summarise(count = n()) %>%
-  complete(decision_comparison) %>%
-  spread(decision_comparison, count, fill = 0) %>%
+  count(epiweek_report, top_zones, decision_comparison) %>%
+  spread(decision_comparison, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_hz_over_time_decisions %>%
@@ -1526,13 +1441,8 @@ table_hz_over_time_decisions %>%
 
 ``` {r health_zone_total_recent_decision_recent}
 
-x_decisions_recent <- outcomes_recent %>%
-  group_by(decision_comparison, top_zones) %>%
-  summarise(count = n())
-
-ggplot(x_decisions_recent, 
-       aes(x = top_zones, y = count, fill = decision_comparison)) +
-  geom_col() +
+ggplot(outcomes_recent, aes(x = top_zones, fill = decision_comparison)) +
+  geom_bar() +
   scale_x_discrete(drop = FALSE) +
   scale_decisions +
   labs(x = "",
@@ -1549,10 +1459,8 @@ ggplot(x_decisions_recent,
 ```{r health_zone_total_recent_table_decisions, fig.keep = "all"}
 
 table_hz_total_recent_decisions <- outcomes_recent %>%
-  group_by(top_zones, decision_comparison) %>%
-  summarise(count = n()) %>%
-  complete(decision_comparison) %>%
-  spread(decision_comparison, count, fill = 0) %>% 
+  count(top_zones, decision_comparison) %>%
+  spread(decision_comparison, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_hz_total_recent_decisions %>%
@@ -1584,10 +1492,8 @@ ggplot(outcomes_recent, aes(x = date, fill = decision_comparison)) +
 ```{r health_zone_time_recent_table_decisions, fig.width = 12, fig.height = 5}
 
 table_hz_over_time_recent_decisions <- outcomes_recent %>%
-  group_by(date, top_zones, decision_comparison) %>%
-  summarise(count = n()) %>%
-  complete(decision_comparison) %>%
-  spread(decision_comparison, count, fill = 0) %>%
+  count(date, top_zones, decision_comparison) %>%
+  spread(decision_comparison, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_hz_over_time_recent_decisions %>%
@@ -1603,12 +1509,11 @@ table_hz_over_time_recent_decisions %>%
 ``` {r health_area_total_decisions, fig.width = 14}
 
 x_decisions <- outcomes %>%
-  group_by(decision_comparison, zone_de_sante, aire_de_sante) %>%
-  summarise(count = n()) 
+  count(decision_comparison, zone_de_sante, aire_de_sante) %>%
+  filter(n >= 100)
 
-x_decisions %>% 
-  filter(count >= 100) %>% 
-ggplot(aes(x = aire_de_sante, y = count, fill = decision_comparison)) +
+ggplot(x_decisions, 
+       aes(x = aire_de_sante, y = n, fill = decision_comparison)) +
   geom_col() +
   scale_x_discrete(drop = FALSE) +
   scale_decisions +
@@ -1632,10 +1537,8 @@ ggplot(aes(x = aire_de_sante, y = count, fill = decision_comparison)) +
 ```{r health_area_total_table_decisions, fig.keep = "all"}
 
 table_ha_total_decision <- outcomes %>%
-  group_by(aire_de_sante, decision_comparison) %>%
-  summarise(count = n()) %>%
-  complete(decision_comparison) %>%
-  spread(decision_comparison, count, fill = 0) %>% 
+  count(aire_de_sante, decision_comparison) %>%
+  spread(decision_comparison, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_ha_total_decision %>%
@@ -1648,14 +1551,11 @@ table_ha_total_decision %>%
 ```{r health_area_time_decision, fig.width = 12, fig.height = 8}
 
 x_decisions <- outcomes %>%
-  filter(top_aires != "other") %>%
-  group_by(epiweek_report_label, decision_comparison, top_aires) %>%
-  summarise(count = n())
+  filter(top_aires != "other")
 
 
-ggplot(x_decisions, aes(x = epiweek_report_label, y = count, 
-                        fill = decision_comparison)) +
-  geom_col() +
+ggplot(x_decisions, aes(x = epiweek_report_label, fill = decision_comparison)) +
+  geom_bar() +
   facet_wrap( ~ top_aires) +
   scale_decisions + 
   labs(x = "",
@@ -1674,10 +1574,8 @@ ggplot(x_decisions, aes(x = epiweek_report_label, y = count,
 ```{r health_area_time_table_decision, fig.keep = "all"}
 
 table_ha_over_time_decisions <- outcomes %>%
-  group_by(epiweek_report, top_aires, decision_comparison) %>%
-  summarise(count = n()) %>%
-  complete(decision_comparison) %>%
-  spread(decision_comparison, count, fill = 0) %>%
+  count(epiweek_report, top_aires, decision_comparison) %>%
+  spread(decision_comparison, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_ha_over_time_decisions %>%
@@ -1694,12 +1592,11 @@ table_ha_over_time_decisions %>%
 
 x_decisions <- outcomes %>%
   filter(date > database_date - 21) %>%
-  group_by(decision_comparison, zone_de_sante, aire_de_sante) %>%
-  summarise(count = n()) 
+  count(decision_comparison, zone_de_sante, aire_de_sante) %>%
+  filter(n >= 20) 
 
-x_decisions %>% 
-  filter(count >= 20) %>% 
-ggplot(aes(x = aire_de_sante, y = count, fill = decision_comparison)) +
+ggplot(x_decisions, 
+       aes(x = aire_de_sante, y = n, fill = decision_comparison)) +
   geom_col() +
   scale_x_discrete(drop = FALSE) +
   scale_decisions +
@@ -1724,10 +1621,8 @@ ggplot(aes(x = aire_de_sante, y = count, fill = decision_comparison)) +
 ```{r health_area_total_recent_table_decision, fig.keep = "all"}
 
 table_ha_total_recent_decisions <- outcomes %>%
-  group_by(aire_de_sante, decision_comparison) %>%
-  summarise(count = n()) %>%
-  complete(decision_comparison) %>%
-  spread(decision_comparison, count, fill = 0) %>% 
+  count(aire_de_sante, decision_comparison) %>%
+  spread(decision_comparison, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
 table_ha_total_recent_decisions %>%
@@ -1741,12 +1636,10 @@ table_ha_total_recent_decisions %>%
 
 x_decisions_recent <- outcomes %>%
   filter(top_aires != "other") %>%
-  filter(date > database_date - 21) %>%
-  group_by(date, decision_comparison, top_aires) %>%
-  summarise(count = n())
+  filter(date > database_date - 21)
 
-ggplot(x_decisions_recent, aes(x = date, y = count, fill = decision_comparison)) +
-  geom_col() +
+ggplot(x_decisions_recent, aes(x = date, fill = decision_comparison)) +
+  geom_bar() +
   facet_wrap( ~ top_aires) +
   scale_decisions + 
   labs(x = "",
@@ -1767,10 +1660,8 @@ ggplot(x_decisions_recent, aes(x = date, y = count, fill = decision_comparison))
 
 table_ha_over_time_recent_decisions <- outcomes %>%
   filter(date > database_date - 21) %>%
-  group_by(date, top_aires, decision_comparison) %>%
-  summarise(count = n()) %>%
-  complete(decision_comparison) %>%
-  spread(decision_comparison, count, fill = 0) %>%
+  count(date, top_aires, decision_comparison) %>%
+  spread(decision_comparison, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
 
 table_ha_over_time_recent_decisions %>%
