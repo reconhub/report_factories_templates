@@ -40,7 +40,7 @@ knitr::opts_chunk$set(echo = TRUE,
   
   **Version:** 2.0.1
   
-  **Reviewed by:** 
+  **Reviewed by:** Neale Batra
 </div>
 
 
