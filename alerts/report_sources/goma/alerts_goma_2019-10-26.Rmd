@@ -559,7 +559,7 @@ ggplot(x, aes(x = top_zones, fill = status)) +
 
 ### Table - total since database start  
 
-```{r health_zone_total_table, fig.keep = "all"}
+```{r table_hz_total_validation, fig.keep = "all"}
 
 table_hz_total_validation <- x %>%
   count(top_zones, status) %>%
@@ -592,7 +592,7 @@ ggplot(x, aes(x = date, fill = status)) +
 
 ### Table - weekly since database start
 
-```{r health_zone_time_table, fig.keep = "all"}
+```{r table_hz_over_time_validation, fig.keep = "all"}
 
 table_hz_over_time_validation <- x %>%
   count(epiweek_report, top_zones, status) %>%
@@ -627,7 +627,7 @@ ggplot(x_recent, aes(x = top_zones, fill = status)) +
 
 ### Table - total past 3 weeks
 
-```{r health_zone_total_recent_table, fig.keep = "all"}
+```{r table_hz_total_recent_validation, fig.keep = "all"}
 
 table_hz_total_recent_validation <- x_recent %>%
   count(top_zones, status) %>%
@@ -661,7 +661,7 @@ ggplot(x_recent, aes(x = date, fill = status)) +
 
 ### Table - daily past 3 weeks 
 
-```{r health_zone_time_recent_table, fig.width = 12, fig.height = 5}
+```{r table_hz_over_time_recent_validation, fig.width = 12, fig.height = 5}
 
 table_hz_over_time_recent_validation <- x_recent %>%
   count(date, top_zones, status) %>%
@@ -705,7 +705,7 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
 
 ### Table - total since database start  
 
-```{r health_area_total_table, fig.keep = "all"}
+```{r table_ha_total_validation, fig.keep = "all"}
 
 table_ha_total_validation <- x %>%
   count(aire_de_sante, status) %>%
@@ -738,7 +738,7 @@ ggplot(x, aes(x = epiweek_report_label, fill = status)) +
 
 ### Table - weekly since database start
 
-```{r health_area_time_table_validation_status, fig.keep = "all"}
+```{r table_ha_over_time_validation, fig.keep = "all"}
 
 table_ha_over_time_validation <- x %>%
   count(epiweek_report, top_aires, status) %>%
@@ -786,7 +786,7 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
 
 ### Table - total past 3 weeks 
 
-```{r health_area_total_recent_table, fig.keep = "all"}
+```{r table_ha_total_recent_validation, fig.keep = "all"}
 
 table_ha_total_recent_validation <- x %>%
   filter(date > database_date - 21) %>%
@@ -826,7 +826,7 @@ ggplot(x_validations, aes(x = date, y = n, fill = status)) +
 
 ### Table - daily past 3 weeks
 
-```{r health_area_time_recent_table, fig.width = 12, fig.height = 5}
+```{r table_ha_over_time_recent_validation , fig.width = 12, fig.height = 5}
 
 table_ha_over_time_recent_validation <- x %>%
   filter(date > database_date - 21) %>%
@@ -913,7 +913,7 @@ ggplot(x_recent, aes(x = date, fill = origin)) +
 
 ### Table - daily past 3 weeks
 
-```{r sous_coord_time_table_origins_alerts_recent, fig.keep = "all"}
+```{r table_origins_recent, fig.keep = "all"}
 
 table_origins_recent <- x_recent %>%
   count(date, origin) %>%
@@ -947,7 +947,7 @@ ggplot(x, aes(x = top_zones, fill = origin)) +
 
 ### Table - total since database start  
 
-```{r health_zone_total_table_origin, fig.keep = "all"}
+```{r table_hz_total_origins, fig.keep = "all"}
 
 table_hz_total_origins <- x %>%
   count(top_zones, origin) %>%
@@ -980,7 +980,7 @@ ggplot(x, aes(x = date, fill = origin)) +
 
 ### Table - weekly since database start
 
-```{r health_zone_time_table_origin, fig.keep = "all"}
+```{r table_hz_over_time_origins, fig.keep = "all"}
 
 table_hz_over_time_origins <- x %>%
   count(epiweek_report, top_zones, origin) %>%
@@ -1014,7 +1014,7 @@ ggplot(x_recent, aes(x = top_zones, fill = origin)) +
 
 ### Table - total past 3 weeks
 
-```{r health_zone_total_recent_table_origins, fig.keep = "all"}
+```{r table_hz_total_recent_origins, fig.keep = "all"}
 
 table_hz_total_recent_origins <- x_recent %>%
   count(top_zones, origin) %>%
@@ -1048,7 +1048,7 @@ ggplot(x_recent, aes(x = date, fill = origin)) +
 
 ### Table - daily past 3 weeks 
 
-```{r health_zone_time_recent_table_origins, fig.width = 12, fig.height = 5}
+```{r table_hz_over_time_recent_origins, fig.width = 12, fig.height = 5}
 
 table_hz_over_time_recent_origins <- x_recent %>%
   count(date, top_zones, origin) %>%
@@ -1092,7 +1092,7 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
 ### Table - total since database start  
 
 
-```{r health_area_total_table_origins, fig.keep = "all"}
+```{r table_ha_total_origins, fig.keep = "all"}
 
 table_ha_total_origins <- x %>%
   count(aire_de_sante, origin) %>%
@@ -1128,7 +1128,7 @@ ggplot(x_origins, aes(x = epiweek_report_label, fill = origin)) +
 
 ### Table - weekly since database start
 
-```{r health_area_time_table_origin, fig.keep = "all"}
+```{r table_ha_over_time_origins, fig.keep = "all"}
 
 table_ha_over_time_origins <- x %>%
   count(epiweek_report, top_aires, origin) %>%
@@ -1174,7 +1174,7 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
 
 ### Table - Total past 3 weeks 
 
-```{r health_area_total_recent_table_origin, fig.keep = "all"}
+```{r table_ha_total_recent_origins, fig.keep = "all"}
 
 table_ha_total_recent_origins <- x %>%
   count(aire_de_sante, origin) %>%
@@ -1213,7 +1213,7 @@ ggplot(x_origins_recent, aes(x = date, y = n, fill = origin)) +
 
 ### Table - daily past 3 weeks
 
-```{r health_area_time_recent_table_origin, fig.width = 12, fig.height = 5}
+```{r table_ha_over_time_recent_origins, fig.width = 12, fig.height = 5}
 
 table_ha_over_time_recent_origins <- x %>%
   filter(date > database_date - 21) %>%
@@ -1310,7 +1310,7 @@ table_decisions %>%
 * Individuals incorrectly validated. They were validated and tested but did not meet the case definition.
 * Individuals incorrectly not validated. They were not validated and tested but did meet the case definition.
 
-```{r sens_spec}
+```{r table_sens_spec}
 
 table_sens_spec <- outcomes %>%
   count(top_zones, decision_comparison) %>%
@@ -1356,7 +1356,7 @@ ggplot(outcomes_recent, aes(x = date, fill = decision_comparison)) +
 
 ### Over time table
 
-``` {r decisions_over_time}
+``` {r table_decisions_recent}
 
 table_decisions_recent <- incidence(outcomes_recent$date, "day", 
                             groups = outcomes_recent$decision_comparison) %>%
@@ -1390,7 +1390,7 @@ ggplot(outcomes, aes(x = top_zones, fill = decision_comparison)) +
 
 ### Table - Total since database start  
 
-```{r health_zone_total_table_decision, fig.keep = "all"}
+```{r table_hz_total_decisions, fig.keep = "all"}
 
 table_hz_total_decisions <- outcomes %>%
   count(top_zones, decision_comparison) %>%
@@ -1423,7 +1423,7 @@ ggplot(outcomes, aes(x = date, fill = decision_comparison)) +
 
 ### Table - weekly since database start
 
-```{r health_zone_time_table_decision, fig.keep = "all"}
+```{r table_hz_over_time_decisions, fig.keep = "all"}
 
 table_hz_over_time_decisions <- outcomes %>%
   count(epiweek_report, top_zones, decision_comparison) %>%
@@ -1456,7 +1456,7 @@ ggplot(outcomes_recent, aes(x = top_zones, fill = decision_comparison)) +
 
 ### Table - total past 3 weeks
 
-```{r health_zone_total_recent_table_decisions, fig.keep = "all"}
+```{r table_hz_total_recent_decisions, fig.keep = "all"}
 
 table_hz_total_recent_decisions <- outcomes_recent %>%
   count(top_zones, decision_comparison) %>%
@@ -1489,7 +1489,7 @@ ggplot(outcomes_recent, aes(x = date, fill = decision_comparison)) +
 
 ### Table - daily past 3 weeks 
 
-```{r health_zone_time_recent_table_decisions, fig.width = 12, fig.height = 5}
+```{r table_hz_over_time_recent_decisions, fig.width = 12, fig.height = 5}
 
 table_hz_over_time_recent_decisions <- outcomes_recent %>%
   count(date, top_zones, decision_comparison) %>%
@@ -1534,7 +1534,7 @@ ggplot(x_decisions,
 ### Table - total since database start  
 
 
-```{r health_area_total_table_decisions, fig.keep = "all"}
+```{r table_ha_total_decision, fig.keep = "all"}
 
 table_ha_total_decision <- outcomes %>%
   count(aire_de_sante, decision_comparison) %>%
@@ -1553,7 +1553,6 @@ table_ha_total_decision %>%
 x_decisions <- outcomes %>%
   filter(top_aires != "other")
 
-
 ggplot(x_decisions, aes(x = epiweek_report_label, fill = decision_comparison)) +
   geom_bar() +
   facet_wrap( ~ top_aires) +
@@ -1571,7 +1570,7 @@ ggplot(x_decisions, aes(x = epiweek_report_label, fill = decision_comparison)) +
 
 ### Table - weekly since database start
 
-```{r health_area_time_table_decision, fig.keep = "all"}
+```{r table_ha_over_time_decisions, fig.keep = "all"}
 
 table_ha_over_time_decisions <- outcomes %>%
   count(epiweek_report, top_aires, decision_comparison) %>%
@@ -1618,7 +1617,7 @@ ggplot(x_decisions,
 
 ### Table - total past 3 weeks 
 
-```{r health_area_total_recent_table_decision, fig.keep = "all"}
+```{r table_ha_total_recent_decisions, fig.keep = "all"}
 
 table_ha_total_recent_decisions <- outcomes %>%
   count(aire_de_sante, decision_comparison) %>%
@@ -1656,7 +1655,7 @@ ggplot(x_decisions_recent, aes(x = date, fill = decision_comparison)) +
 
 ### Table - daily past 3 weeks
 
-```{r health_area_time_recent_table_decision}
+```{r table_ha_over_time_recent_decisions}
 
 table_ha_over_time_recent_decisions <- outcomes %>%
   filter(date > database_date - 21) %>%
