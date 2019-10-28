@@ -238,6 +238,15 @@ x <- x %>%
 
 ```
 
+Remove data from before 2019-01-01 as not as reliable. 
+
+```{r last_cleaning}
+
+x <- x %>%
+  filter(date >= "2019-01-01")
+
+```
+
 
 ## Outcomes
 
