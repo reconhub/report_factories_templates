@@ -969,7 +969,7 @@ community_deaths_overall <- x %>%
   count(type_death) %>%
   spread(type_death, n, fill = 0, drop = FALSE) %>%
   mutate(total = nrow(x), # avoid adorn_totals
-         denom = total,
+         denom = total - unknown,
          p = prop_to_perc(community / denom),
          p_lower = prop_ci(community, denom, "lower", perc = TRUE),
          p_upper = prop_ci(community, denom, "upper", perc = TRUE))
@@ -1504,6 +1504,49 @@ table_hcw_sub_coordination_time %>%
 ```
 
 
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# Data completeness {.tabset .tabset-fade .tabset-pills}
+      
+<!-- ======================================================= -->
+## Outline 
+        
+In the above tables, we can calculate the completeness as 'n / total', 
+where 'n' excludes 'unknown'. Here, we plot:
+  
+* overall completeness
+
+      
+
+<!-- ======================================================= -->
+## Overall
+        
+```{r completeness}
+
+
+completeness <- 100*rbind(known_contact = contacts_overall$denom / contacts_overall$total,
+                          followed = followed_overall$denom / followed_overall$total,
+                          community_deaths = community_deaths_overall$denom / community_deaths_overall$total,
+                          hcw_cases = hcw_overall$denom / hcw_overall$total)
+
+completeness <- data.frame(labels = factor(rownames(completeness), levels=rownames(completeness)), completeness)
+
+ggplot(completeness, aes(x = labels, y = completeness)) +
+  theme_bw() +
+  geom_col(fill = color_known_contact) +
+  scale_y_continuous(limits = c(0, 100)) +
+  large_txt +
+  labs(title = "Reporting Completeness",
+             x = "",
+             y = "% of cases with data for each variable")
+
+
+```
 
 
 
