@@ -1,0 +1,5 @@
+*~
+report_outputs
+.Rhistory
+*.Rproj
+data/

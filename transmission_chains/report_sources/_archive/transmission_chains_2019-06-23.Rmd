@@ -1,0 +1,964 @@
+---
+title: "Analyses of transmission chains"
+author: "Thibaut, Maddy, Sam, Luc, Sonia, Elias, Xavier, the Butembo team, the analytic cell Goma"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: zenburn
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+    toc_collapse: no
+    toc_depth: 4
+    toc_float: yes
+    css: !expr here::here('css', 'style.css')
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      collapse = TRUE,
+                      fig.width = 8,
+                      fig.height = 6,
+                      dpi = 150,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This report focusses on transmission chains of the outbreak, derived from the
+narratives. This work was pioneered by the Butembo team, who assembled specific
+linelists with transmission information. To simplify this workflow for other
+teams (with less data management resources), we streamline this process as
+follows:
+
+1. information on the cases are taken from the clean linelist data (the *master
+   linelist*), thus not requiring additional work from the field teams
+   
+2. information on transmissions is stored in a separate file following the same
+   model as the master linelist, i.e. a google spreadsheet which can be edited
+   by different data managers; this file only contains information on the
+   *transmissions*, not on the cases, e.g.: from whom, to whom, which kind of
+   transmission context etc.
+   
+The two sources of data will be merged using *epicontacts*.
+
+
+
+### Data used
+
+What is the source of your data? Does it need running some previous reports like
+preliminary data cleaning? If so, list these reports here.
+
+### Method
+
+The data preparation involves the following steps, detailed in the following tabs:
+
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc.
+
+* **Clean data**: this section contains *ad hoc* data cleaning, i.e. which is
+  not used in other reports (otherwise cleaning should be done in a dedicated
+  report); this section is also used to create new variables used in the
+  analyses
+
+
+
+
+## Load scripts
+
+These scripts will load:
+
+* all local scripts, stored as `.R` filesinside `/scripts/`
+* all global scripts, i.e. stored outside the factory in `../scripts/`
+* the path to the cleaned VHF data stored as `x`
+
+```{r read_scripts}
+
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$",
+                     full.names = TRUE)
+for (file in scripts_files) source(file)
+
+```
+
+
+
+## Load data
+
+Two types of data are used in this report:
+
+1. the clean *master linelist*, called `linelist` in this report
+2. the raw *master transmission list*, called `chains` in this report
+
+```{r load_data}
+
+## load the master linelist ('MLL')
+current_linelist
+linelist <- rio::import(current_linelist) %>%
+    as_tibble()
+linelist
+
+## load the chains
+current_chains
+chains_raw <- custom_import(current_chains) %>%
+    as_tibble()
+chains_raw
+
+## extract completion dates
+linelist_file_name <- gsub("^[^.]+/", "", current_linelist)
+linelist_date <- linelist_file_name %>%
+  guess_dates()
+linelist_date
+
+chains_file_name <- gsub("^[^.]+/", "", current_chains)
+chains_date <- chains_file_name %>%
+  guess_dates()
+chains_date
+
+```
+
+The **completion dates** of the databases are:
+
+* master linelist: **`r format(linelist_date, format = "%A %d %b %Y")`**
+* master transmission: **`r format(chains_date, format = "%A %d %b %Y")`**
+
+
+
+
+
+## Clean data
+
+As we use a clean master linelist, cleaning only applies here to the *master
+transmission list* stored in the object called `chains_raw`. Once cleaned,
+transmission data will be stored as `chains`.
+
+We use *linelist*'s function `clean_data()` to:
+
+- remove all special characters from the data
+- set all characters to lower case
+- replace all accentuated and diacritic characters with their closest ascii
+  match in the latin alphabet
+- replace all separators with a single `_`
+- replace all mis-spelling using a overall dictionary (see the file
+  `cleaning_rules.xlsx` in `/dictionary/`, or type `cleaning_rules` in this R
+  session, after compiling the document
+- (optionally) detect date formats and convert data to dates, including cases
+  where format varies within a column
+  
+
+This cleaning is achieved with:
+
+```{r data_cleaning}
+
+chains <- chains_raw %>%
+  clean_data(guess_dates = FALSE) %>%
+  as_tibble()
+
+chains
+
+```
+
+
+
+
+## Cleaning using dictionary
+
+Here we correct typos etc using our dictionary. We then tabulate the categories
+of key variables to make sure nothing has been left out. New items to clean
+should be added to the dictionary in `dictionary/cleaning_rules.xlsx`.
+
+```{r clean_dic}
+
+## clean using dictionary
+chains <- chains %>%
+  clean_variable_spelling(wordlists = cleaning_rules)
+
+## check variables
+table(chains$type_contamination, useNA = "ifany")
+table(chains$lien_cas_source, useNA = "ifany")
+
+```
+
+
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# Making an *epicontacts* object {.tabset .tabset-fade .tabset-pills}
+
+## Outline 
+
+In this section we build an *epicontacts* object and provide some simple
+descriptive statistics and graphics.
+
+
+## Use the devel version!
+
+The following parts need the current development version of *epicontacts*. You
+will need `devtools` to install it directly from github, by typing::
+
+```{r install_epicontacts, eval = FALSE}
+
+devtools::install_github("reconhub/epicontacts")
+
+```
+
+Note that you need to do this only once! As an alternative, use a recent
+deployer: it contains the right version of the package.
+
+
+
+
+## Building the epicontacts
+
+We build the *epicontacts* object using:
+
+* the *master linelist* stored in `linelist`, keeping only selected variables
+  useful for further analyses, and entries for which we are missing VHF
+  identifiers (`vhf_code`), as well as duplicates
+  
+* the *master transmission list* data stored in `chains`
+
+```{r epicontacts}
+
+select_linelist <- linelist %>%
+  rename(mll_id = id,
+         vhf_id = vhf_code) %>% 
+  select("vhf_id",
+         "mll_id",
+         "epicasedef",
+         "date_onset",
+         "date_report",
+         "date_death",
+         "date_admission",
+         "date_exposure_start",
+         "date_exposure_end",
+         "zone_de_sante",
+         "aire_de_sante",
+         "age",
+         "age_class",
+         "gender",
+         "hcw",
+         "firstname",
+         "surname",
+         "current_status",
+         "report_status",
+         "outcome",
+         "hosp1_name") %>%
+  filter(!is.na(vhf_id),
+         !duplicated(vhf_id))
+
+x <- make_epicontacts(linelist = select_linelist,
+                      contacts = chains,
+                      directed = TRUE,
+                      id = "vhf_id",
+                      from = "source_case_id",
+                      to = "case_id")
+x
+
+```
+
+
+
+## Summary
+
+This provides an overview of the content of the *epicontacts* object. Pay
+attention, in particular, to cases that are in the transmission tree (called
+"contacts" in *epicontacts* terminology) but not in the linelist. These could be
+recovered by using a larger database for linelist, such as VHF or the new MLL
+(Master Line List) currated in Goma.
+
+```{r summary}
+summary(x)
+```
+
+
+
+## Visualisations
+
+This is a general visusalisation of the whole dataset:
+
+```{r plot_chains}
+
+plot_x <- plot(x,
+               node_color = "zone_de_sante",
+               node_shape = "gender",
+               shapes = c(female = "female",
+                          male = "male",
+                          unknown = "question-circle"),
+               legend_max = 100,
+               edge_color = "type_contamination"
+               )
+plot_x
+
+```
+
+
+
+
+## Active chains on last 21 days
+
+We define as active chains, on a given limit date: 
+
+1. cases that were isolated after the limit date, set up to be 21 days prior to
+   the completion date of the database (i.e. here, **`r format(chains_date - 21,
+   format = "%A %d %b %Y")`**)
+   
+2. all the cases of the transmission chains linked to 1)
+
+Graphs will be shown using the date of isolation (`date_admission`) if no value
+is missing; otherwise the default plotting of transmissions will be used.
+
+```{r plot_chains_time_window}
+
+## identify transmission chains ("clusters" or "connected components" in graph
+## terminology)
+x <- get_clusters(x, member_col = "cluster_id", size_col = "chain_size")
+
+## force character type
+x$linelist$cluster_id <- paste("chain", x$linelist$cluster_id, sep = "_")
+
+
+## find source case of the transmission chains; these are cases who have no edge
+## coming in, and at least one coming out
+
+in_degree <- data.frame(in_degree = get_degree(x, "in")) %>%
+  rownames_to_column(var = "id")
+out_degree <- data.frame(out_degree = get_degree(x, "out")) %>%
+  rownames_to_column(var = "id")
+
+x$linelist <- x$linelist %>%
+  left_join(in_degree) %>%
+  left_join(out_degree) %>%
+  mutate(is_root = (in_degree == 0) & (out_degree > 0),
+         root = if_else(is_root, id, NULL))
+
+## find roots of each transmission chain
+roots <- split(x$linelist$root, x$linelist$cluster_id) %>%
+  lapply(function(e) e[!is.na(e)]) %>%
+  stack() %>%
+  setNames(c("root", "chain_id")) %>%
+  as_tibble() %>% 
+  select("chain_id", "root")
+
+roots
+
+## add this information to the linelist as `chain_id`
+x$linelist <- x$linelist %>%
+  mutate(chain_id = clean_spelling(cluster_id, wordlist = roots))
+
+
+## set limit date
+date_limit <- chains_date - 42
+
+## find transmission chains whose latest case is after the limit date
+chains_to_keep <- x$linelist %>%
+  group_by(chain_id) %>%
+  summarise(most_recent = max(date_admission, na.rm = TRUE)) %>%
+  filter(most_recent > date_limit) %>%
+  pull(chain_id)
+
+x_active <- subset(x,
+                   node_attribute = list(chain_id = chains_to_keep)) %>%
+  thin("contacts")
+
+## check if some date_admission are missing
+missing_date <- get_pairwise(x_active, "date_admission") %>% is.na()
+
+if (!any(missing_date)) {
+  x_axis_info <- "date_admission"
+} else {
+  x_axis_info <- NULL
+}
+
+## make the plot
+plot_x_active <- plot(x_active,
+                      node_color = "chain_id",
+                      node_shape = "gender",
+                      shapes = c(female = "female",
+                                 male = "male",
+                                 unknown = "question-circle"),
+                      legend_max = 100,
+                      edge_color = "type_contamination",
+                      x_axis = x_axis_info,
+                      edge_width = 5
+                      )
+plot_x_active
+
+
+```
+
+
+
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# Descriptive analyses {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+In the following we provide some simple descriptions of the transmission
+network. We focus on spatial patterns in transmissions, comparing the locations
+of the sources cases and their secondary cases, and the relative frequencies of
+these transmissions.
+
+
+
+
+## By sex
+
+```{r contacts_sex}
+
+pairs_sex <- get_pairwise(x,
+                          "gender",
+                          function(from, to)
+                            as.data.frame(table(from, to)))
+
+ggplot(pairs_sex,
+       aes(y = from, x = to, size = Freq)) +
+  geom_point(color = "navy", alpha = .5) +
+  scale_size_continuous("Number of \ntransmissions",
+                        range = c(1, 20),
+                        limits = c(1, NA),
+                        breaks = c(1, 5, 10, 20, 30, 40)) +
+  large_txt +
+  rotate_x_text(45) + 
+  labs(title = "Transmissions between sex",
+       y = "Source case",
+       x = "Infectee")
+
+```
+
+We provide the alternative circular visualisation; colors of the flows are
+indicative of the source.
+
+```{r contacts_sex_circi}
+
+## Chord diagram
+circle_plot(pairs_sex, label_space = 2)
+
+```
+
+
+
+
+## By age class
+
+```{r contacts_age}
+
+pairs_age <- get_pairwise(x,
+                          "age_class",
+                          function(from, to)
+                            as.data.frame(table(from, to)))
+
+ggplot(pairs_age,
+       aes(y = from, x = to, size = Freq)) +
+  geom_point(color = "navy", alpha = .5) +
+  scale_size_continuous("Number of \ntransmissions",
+                        range = c(1, 20),
+                        limits = c(1, NA),
+                        breaks = c(1, 5, 10, 20, 30, 40)) +
+  large_txt +
+  rotate_x_text(45) + 
+  labs(title = "Transmissions between sex",
+       y = "Source case",
+       x = "Infectee")
+
+```
+
+We provide the alternative circular visualisation; colors of the flows are
+indicative of the source.
+
+```{r contacts_age_circi}
+
+## Chord diagram
+circle_plot(pairs_age, label_space = 2)
+
+```
+ 
+## By health zones
+
+We plot transmissions by health zones:
+
+```{r contacts_zone_de_sante}
+
+pairs_zone_de_sante <- get_pairwise(x,
+                                    "zone_de_sante",
+                                    function(from, to)
+                                      as.data.frame(table(from, to)))
+
+ggplot(pairs_zone_de_sante,
+       aes(y = from, x = to, size = Freq)) +
+  geom_point(color = "navy", alpha = .5) +
+  scale_size_continuous("Number of \ntransmissions",
+                        range = c(1, 20),
+                        limits = c(1, NA),
+                        breaks = c(1, 5, 10, 20, 30, 40)) +
+  large_txt +
+  rotate_x_text(45) + 
+  labs(title = "Transmissions across health zones",
+       y = "Source case",
+       x = "Infectee")
+
+```
+
+We provide the alternative circular visualisation; colors of the flows are
+indicative of the source.
+
+```{r contacts_zone_de_sante_circi}
+
+## Chord diagram
+circle_plot(pairs_zone_de_sante, label_space = 2)
+
+```
+
+We compute the proportion of transmission happening across different health
+zones:
+
+```{r move_zones}
+
+move_zone <- get_pairwise(x,
+                          "zone_de_sante",
+                          function(from, to)
+                            as.logical(na.omit(from != to)))
+move_zone
+
+## mean and 95% CI
+mean(move_zone)
+prop_ci(k = sum(move_zone), n = length(move_zone))
+
+```
+
+
+
+
+## By health areas
+
+We plot transmissions by health areas:
+
+```{r contacts_aire_de_sante, fig.width = 12}
+
+pairs_aire_de_sante <- get_pairwise(x,
+                                    "aire_de_sante",
+                                    function(from, to)
+                                      as.data.frame(table(from, to)))
+
+ggplot(pairs_aire_de_sante,
+       aes(y = from, x = to, size = Freq)) +
+  geom_point(color = "navy", alpha = .5) +
+  scale_size_continuous("Number of \ntransmissions",
+                        range = c(1, 10),
+                        limits = c(1, NA),
+                        breaks = c(1, 5, 10, 20, 30, 40)) +
+  large_txt +
+  rotate_x_text(90) + 
+  labs(title = "Transmissions across health areas",
+       y = "Source case",
+       x = "Infectee")
+
+
+```
+
+We provide the alternative circular visualisation; colors of the flows are
+indicative of the source.
+
+```{r contacts_aire_de_sante_circi}
+
+## Chord diagram
+circle_plot(pairs_aire_de_sante, label_space = 2)
+
+```
+
+We compute the proportion of transmission happening across different health
+areas:
+
+```{r move_areas}
+
+move_area <- get_pairwise(x,
+                          "aire_de_sante",
+                          function(from, to)
+                            as.logical(na.omit(from != to)))
+move_area
+
+## mean and 95% CI
+mean(move_area)
+prop_ci(k = sum(move_area), n = length(move_area))
+
+```
+
+
+
+
+## Sources and recipients of transmissions
+
+In this section we characterise health areas in terms of the number of
+transmissions given ("*sources*"), or received ("*recipients*").
+
+```{r sources_recipients, fig.width = 10}
+
+## count cases sourced by area
+df_sources <- pairs_aire_de_sante %>%
+  filter(as.character(from) != as.character(to), Freq > 0) %>%
+  group_by(from) %>%
+  summarise(n_sourced = sum(Freq)) %>%
+  rename(aire_de_sante = from)
+
+## count cases received by area
+df_receivers <- pairs_aire_de_sante %>%
+  filter(as.character(from) != as.character(to), Freq > 0) %>%
+  group_by(to) %>%
+  summarise(n_received = sum(Freq)) %>%
+  rename(aire_de_sante = to)
+
+## put the information together
+df_sources_recipients <- full_join(df_sources, df_receivers) %>%
+  filter(aire_de_sante != "inconnu") %>% 
+  replace_na(list(n_sourced = 0, n_received = 0)) %>%
+  arrange(desc(n_sourced), desc(n_received))
+
+## add info on zones
+zone_info <- linelist %>%
+  group_by(zone_de_sante, aire_de_sante) %>%
+  count() %>%
+  select(1:2)
+df_sources_recipients <- right_join(zone_info, df_sources_recipients)
+
+## display the table
+df_sources_recipients %>%
+  show_table()
+
+## make the plot
+ggplot(df_sources_recipients,
+       aes(x = n_received,
+           y = n_sourced,
+           color = aire_de_sante)) +
+  geom_point() +
+  geom_label_repel(aes(label = aire_de_sante), size = 3) +
+  scale_x_continuous(breaks = int_breaks) +
+  scale_y_continuous(breaks = int_breaks) +
+  large_txt +
+  facet_wrap(~ zone_de_sante) +
+  scale_color_discrete(guide = FALSE) +
+  theme_bw() +
+  labs(title = "Sources and recipients of cases",
+       x = "Number of cases received",
+       y = "Number of cases sourced")
+
+```
+
+
+
+
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# Analysis of transmissibility {.tabset .tabset-fade .tabset-pills}
+
+## Reproduction number
+
+We can assess the effective reproduction number ($R$) by looking at the numbers
+of secondary cases by index case:
+
+```{r R}
+
+## in-degree
+x %>% get_degree() %>% table()
+
+## out-degree = reproduction number
+x %>% get_degree("out") %>% table()
+
+R_df <- x %>%
+  get_degree("out") %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  rename("id" = "rowname", "R" = ".")
+
+head(R_df)
+
+```
+
+We create a new `data.frame` with R values and case info from the linelist;
+unlike the linelist, where each line is a case, here each line is a source case:
+
+```{r R_df}
+
+R_df <- left_join(R_df, x$linelist, by = "id") %>%
+  as_tibble()
+
+R_df %>%
+  show_table()
+
+```
+
+Because of delays from primary to secondary onset, and from onset to
+notification, we need to ignore the latest source cases to avoid
+under-estimating the $R$. We use a conservative limit of 45 days:
+
+```{r R_plots}
+
+old_cases <- R_df %>%
+  filter(date_onset < (chains_date - 45))
+
+ggplot(old_cases, aes(x = R)) +
+  geom_bar() +
+  large_txt +
+  labs(title = "Number of secondary cases by index case",
+       x = "Observed number of secondary cases (R)",
+       y = "Frequency")
+
+```
+
+
+
+
+## Estimating the distribution of R
+
+In this part we estimate the underlying distribution of $R$, accounting for
+superspreading using a Negative Binomial distibution. The two parameters that
+will be estimated are:
+
+* the reproduction number
+* the dispersion parameter, which increases when super-spreading events increase
+  in frequency.
+
+```{r estimate_R}
+
+## likelihood function for a Neg Bin distribution of R
+## (m: the mean; disp: dispersion parameter)
+
+likelihood <- function(mean, disp) {
+  ## exp(sum(dpois(old_cases$R, m, log = TRUE)))
+  exp(sum(dnbinom(old_cases$R, mu = mean, size = disp, log = TRUE)))
+}
+
+R_values <- seq(0, 2, length = 100)
+dispersion_values <- seq(0, 2, length = 100)
+grid <- expand.grid(R = R_values,
+                    dispersion = dispersion_values)
+like_values <- apply(grid, 1, function(e) likelihood(e[1], e[2]))
+
+R_ml <- grid[which.max(like_values), "R"]
+R_ml
+disp_ml <- grid[which.max(like_values), "dispersion"]
+disp_ml
+
+df_grid_like <- cbind.data.frame(grid, likelihood = like_values)
+
+ggplot(df_grid_like) +
+  geom_raster(aes(x = R, y = dispersion, fill = likelihood)) +
+  large_txt +
+  scale_fill_gradient(low = "#ffffff", high = "#800000") +
+  labs(title = "Likelihood surface: \nnegative binomial distribution",
+       x = "Mean reproduction number (R)",
+       y = "Dispersion parameter")
+
+```
+
+The likelihood function is well-defined, with a maximum-likelihood estimate of
+$R$ is `r round(R_ml, 2)`. How well does this model fit the data? We can compare
+predictions from the Negative Binomial distribution (MLE) to the numbers of
+secondary cases actually observed:
+
+```{r expected_secondary}
+
+n_cases <- 0:15
+obs_freq <- sapply(n_cases, function(e) mean(old_cases$R == e))
+pred_freq <- dnbinom(n_cases, mu = R_ml, size = disp_ml)
+
+df_model <- data.frame(n_cases,
+                       observed = obs_freq,
+                       predicted = pred_freq) %>%
+  gather(type, frequency, -1)
+
+ggplot(df_model,
+       aes(x = n_cases,
+           y = frequency,
+           fill = type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  large_txt +
+  scale_x_continuous(breaks = int_breaks) +
+  scale_fill_manual("", values = c(observed = "#d27979", predicted = "#9999ff")) +
+  labs(title = "Nombre de cas secondaires observés et prédits",
+       x = "Nombre de cas secondaires",
+       y = "Fréquence")
+
+```
+
+
+
+## Effective reproduction number in time
+
+```{r R_in_time}
+
+ggplot(R_df, aes(x = date_admission, y = R)) +
+  geom_point() +
+  geom_smooth() +
+  large_txt +
+  scale_weeks +
+  rotate_x_text(45) +
+  labs(title = "Nombre de reproduction effectif au cours du temps",
+       x = "Date d'admission",
+       y = "Nombre de cas secondaires par cas index")
+
+```
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# Export tables {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+We export R objects (the *epicontacts* object) as well as the main plot as a
+separate html file.
+
+
+
+## R objects
+
+We export the *epicontacts* object.
+
+```{r rds_exports}
+
+if (!dir.exists("produced_rds")) {
+  dir.create("produced_rds")
+}
+
+saveRDS(x,
+        file = file.path("produced_rds",
+                         "epicontacts_rds"))
+destination <- here("data", "clean", "epicontacts_rds")
+
+file.copy(from = file.path("produced_rds",
+                           "epicontacts_rds"),
+          to = destination,
+          overwrite = TRUE)
+
+```
+
+
+
+
+
+
+## Excel files
+
+We export the table containing information on: 
+
+* the cases (linelist info)
+* the effective reproduction numbers ($R$)
+* the identifiers of the transmission chains
+
+```{r xlsx_exports}
+
+if (!dir.exists("produced_xlsx")) {
+  dir.create("produced_xlsx")
+}
+
+rio::export(R_df,
+            file = file.path("produced_xlsx",
+                             "linelist_with_R_and_chains.xlsx"))
+
+```
+
+
+**Links to the files:**
+
+- [linelist_with_R_and_chains.xlsx](produced_xlsx/linelist_with_R_and_chains.xlsx)
+
+
+
+## visNetwork visualisation
+
+We save the plot of the transmission chain as a separate file called
+`plot_chains.html`:
+
+```{r export_html}
+
+visNetwork::visSave(plot_x,
+                    file = "plot_chains.html")
+
+visNetwork::visSave(plot_x_active,
+                    file = "plot_active_chains.html")
+
+```
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# System information {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+The following information documents the system on which the document was
+compiled.
+
+
+
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+R.version
+```
+
+
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+sessionInfo()
+```
