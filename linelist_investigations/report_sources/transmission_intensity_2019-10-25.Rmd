@@ -103,7 +103,7 @@ These scripts will load:
 ## read scripts
 path_to_scripts <- here::here("scripts")
 scripts_files <- dir(path_to_scripts, pattern = ".R$", full.names = TRUE)
-for (file in scripts_files) source(file)
+for (file in scripts_files) source(file, local = TRUE)
 
 ggthemr("grape")
 
