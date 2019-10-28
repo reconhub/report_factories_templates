@@ -1528,13 +1528,12 @@ where 'n' excludes 'unknown'. Here, we plot:
         
 ```{r completeness}
 
-
-completeness <- 100*rbind(known_contact = contacts_overall$denom / contacts_overall$total,
-                          followed = followed_overall$denom / followed_overall$total,
-                          community_deaths = community_deaths_overall$denom / community_deaths_overall$total,
-                          hcw_cases = hcw_overall$denom / hcw_overall$total)
-
-completeness <- data.frame(labels = factor(rownames(completeness), levels=rownames(completeness)), completeness)
+completeness <- data.frame(
+    known_contact = 100 * contacts_overall$denom / contacts_overall$total,
+    followed = 100 * followed_overall$denom / followed_overall$total,
+    community_deaths = 100 * community_deaths_overall$denom / community_deaths_overall$total,
+    hcw_cases = 100 * hcw_overall$denom / hcw_overall$total) %>%
+  gather(labels, completeness) 
 
 ggplot(completeness, aes(x = labels, y = completeness)) +
   theme_bw() +
