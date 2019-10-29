@@ -1585,12 +1585,12 @@ ggplot(x_decisions,
 
 ```{r table_ha_total_decision, fig.keep = "all"}
 
-table_ha_total_decision <- outcomes %>%
+table_ha_total_decisions <- outcomes %>%
   count(aire_de_sante, decision_comparison) %>%
   spread(decision_comparison, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
 
-table_ha_total_decision %>%
+table_ha_total_decisions %>%
  show_table()
   
 ```
@@ -1737,6 +1737,8 @@ knitr::opts_chunk$set(eval = TRUE)
 We export the clean data to the clean data folder and some of the relevant tables, which will be placed in the current
 working directory.
 
+
+
 <!-- ======================================================= -->
 ## R objects
 
@@ -1768,7 +1770,7 @@ We copy these files to the `data/clean` folder:
 # copy some files into `data/clean/`
 
 # Provide the destination of where to copy the data
-destination <- here::here("data",
+destination <- here("data",
                     "clean",
                     rds_file_name)
 # Copy the rds data
@@ -1779,20 +1781,20 @@ file.copy(from = file.path("produced_rds", rds_file_name),
 ```
 
 
+
 <!-- ======================================================= -->
 ## Excel files
 
-```{r exports, eval = TRUE}
-
-if (!dir.exists("produced_xlsx")) {
-  dir.create("produced_xlsx")
-}
-
-```
+The following code exports all tables named in `to_report` to `xslx` files,
+stored inside the folder `produced_xlsx`:
 
 ### Cleaned alerts database
 
 ``` {r exports_cleaned_alerts}
+
+if (!dir.exists("produced_xlsx")) {
+  dir.create("produced_xlsx")
+}
 
 ## Cleaned Alerts Database
 rio::export(x, 
@@ -1800,261 +1802,104 @@ rio::export(x,
 
 ```
 
-### Validation status 
+``` {r exports_tables}
 
-``` {r exports_validation}
-
-## Validation Status
-
-### since database start over time sous coordination
-table_validation_file_name <- sprintf("%stable_validation.xlsx",
-                                        undated_file_name(current_goma))
-rio::export(table_validation_overall_time,
-            file.path("produced_xlsx", table_validation_file_name))
-
-### past 3 weeks over time sous coordination
-table_validation_recent_file_name <- sprintf("%stable_validation_recent.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_validation_overall_past_3_weeks,
-            file.path("produced_xlsx", table_validation_recent_file_name))
-
-### since database start by health zone total
-table_hz_total_validation_file_name <- sprintf("%stable_hz_validation_total.xlsx",
-                                    undated_file_name(current_goma))
-rio::export(table_hz_total_validation,
-            file.path("produced_xlsx", table_hz_total_validation_file_name))
-
-### since database start by health zone over time
-table_hz_over_time_validation_file_name <- sprintf("%stable_hz_validation_over_time.xlsx",
-                                           undated_file_name(current_goma))
-rio::export(table_hz_over_time_validation,
-            file.path("produced_xlsx", table_hz_over_time_validation_file_name))
-
-### past 3 weeks by health zone total
-table_hz_total_recent_validation_file_name <- sprintf("%stable_hz_validation_total_recent.xlsx",
-                                        undated_file_name(current_goma))
-rio::export(table_hz_total_recent_validation,
-            file.path("produced_xlsx", table_hz_total_recent_validation_file_name))
-
-### past 3 weeks by health zone over time 
-table_hz_over_time_recent_validation_file_name <- sprintf("%stable_hz_validation_over_time_recent.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_hz_over_time_recent_validation,
-            file.path("produced_xlsx", table_hz_over_time_recent_validation_file_name))
-
-### since database start by health area total
-table_ha_total_validation_file_name <- sprintf("%stable_ha_validation_total.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_ha_total_validation_file_name,
-            file.path("produced_xlsx", table_ha_total_validation_file_name))
-
-### since database start by health area over time
-table_ha_over_time_validation_file_name <- sprintf("%stable_ha_validation_over_time.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_ha_over_time_validation,
-            file.path("produced_xlsx", table_ha_over_time_validation_file_name))
-
-### past 3 weeks by health area total
-table_ha_total_recent_validation_file_name <- sprintf("%stable_ha_validation_total_recent.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_ha_total_recent_validation,
-            file.path("produced_xlsx", table_ha_total_recent_validation_file_name))
-
-### past 3 weeks by health area over time
-table_ha_over_time_recent_validation_file_name <- sprintf("%stable_ha_validation_over_time_recent.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_ha_over_time_recent_validation,
-            file.path("produced_xlsx", table_ha_over_time_recent_validation_file_name))
-
-
+to_export <- c("table_validation_overall_time",
+               "table_validation_overall_past_3_weeks",
+               "table_hz_total_validation",
+               "table_hz_over_time_validation",
+               "table_hz_total_recent_validation",
+               "table_hz_over_time_recent_validation",
+               "table_ha_total_validation",
+               "table_ha_over_time_validation",
+               "table_ha_total_recent_validation",
+               "table_ha_over_time_recent_validation",
+               "table_origins",
+               "table_origins_recent",
+               "table_hz_total_origins",
+               "table_hz_over_time_origins",
+               "table_hz_total_recent_origins",
+               "table_hz_over_time_recent_origins",
+               "table_ha_total_origins",
+               "table_ha_over_time_origins",
+               "table_ha_total_recent_origins",
+               "table_ha_over_time_recent_origins",
+               "table_decisions",
+               "table_sens_spec",
+               "table_decisions_recent",
+               "table_hz_total_decisions",
+               "table_hz_over_time_decisions",
+               "table_hz_total_recent_decisions",
+               "table_hz_over_time_recent_decisions",
+               "table_ha_total_decisions",
+               "table_ha_over_time_decisions",
+               "table_ha_total_recent_decisions",
+               "table_ha_over_time_recent_decisions")
+               
 ```
 
-### Alert origins
+```{r xlsx_exports, eval = TRUE}
 
-``` {r exports_origins}
-
-## Origins
-
-### since database start over time sous coordination
-table_origins_file_name <- sprintf("%stable_origins.xlsx",
-                                        undated_file_name(current_goma))
-rio::export(table_origins,
-            file.path("produced_xlsx", table_origins_file_name))
-
-### past 3 weeks over time sous coordination
-table_origins_recent_file_name <- sprintf("%stable_origins_recent.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_origins_recent,
-            file.path("produced_xlsx", table_origins_recent_file_name))
-
-### since database start by health zone total
-table_hz_total_origins_file_name <- sprintf("%stable_hz_origins_total.xlsx",
-                                    undated_file_name(current_goma))
-rio::export(table_hz_total_origins,
-            file.path("produced_xlsx", table_hz_total_origins_file_name))
-
-### since database start by health zone over time
-table_hz_over_time_origins_file_name <- sprintf("%stable_hz_origins_over_time.xlsx",
-                                           undated_file_name(current_goma))
-rio::export(table_hz_over_time_origins,
-            file.path("produced_xlsx", table_hz_over_time_origins_file_name))
-
-### past 3 weeks by health zone total
-table_hz_total_recent_origins_file_name <- sprintf("%stable_hz_origins_total_recent.xlsx",
-                                        undated_file_name(current_goma))
-rio::export(table_hz_total_recent_origins,
-            file.path("produced_xlsx", table_hz_total_recent_origins_file_name))
-
-### past 3 weeks by health zone over time 
-table_hz_over_time_recent_origins_file_name <- sprintf("%stable_hz_origins_over_time_recent.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_hz_over_time_recent_origins,
-            file.path("produced_xlsx", table_hz_over_time_recent_origins_file_name))
-
-### since database start by health area total
-table_ha_total_origins_file_name <- sprintf("%stable_ha_origins_total.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_ha_total_origins_file_name,
-            file.path("produced_xlsx", table_ha_total_origins_file_name))
-
-### since database start by health area over time
-table_ha_over_time_origins_file_name <- sprintf("%stable_ha_origins_over_time.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_ha_over_time_origins,
-            file.path("produced_xlsx", table_ha_over_time_origins_file_name))
-
-### past 3 weeks by health area total
-table_ha_total_recent_origins_file_name <- sprintf("%stable_ha_origins_total_recent.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_ha_total_recent_origins,
-            file.path("produced_xlsx", table_ha_total_recent_origins_file_name))
-
-### past 3 weeks by health area over time
-table_ha_over_time_recent_origins_file_name <- sprintf("%stable_ha_origins_over_time_recent.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_ha_over_time_recent_origins,
-            file.path("produced_xlsx", table_ha_over_time_recent_origins_file_name))
-
-```
-
-
-### Validation decision
-
-``` {r exports_validation_decision}
-
-## Validation Decision
-
-### since database start over time sous coordination
-table_decisions_file_name <- sprintf("%stable_decisions.xlsx",
-                                        undated_file_name(current_goma))
-rio::export(table_decisions,
-            file.path("produced_xlsx", table_decisions_file_name))
-
-### since database start over time sous coordination
-table_sens_spec_file_name <- sprintf("%stable_sens_spec.xlsx",
-                                        undated_file_name(current_goma))
-rio::export(table_sens_spec,
-            file.path("produced_xlsx", table_sens_spec_file_name))
-
-### past 3 weeks over time sous coordination
-table_decisions_recent_file_name <- sprintf("%stable_decisions_recent.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_decisions_recent,
-            file.path("produced_xlsx", table_decisions_recent_file_name))
-
-### since database start by health zone total
-table_hz_total_decisions_file_name <- sprintf("%stable_hz_decisions_total.xlsx",
-                                    undated_file_name(current_goma))
-rio::export(table_hz_total_decisions,
-            file.path("produced_xlsx", table_hz_total_decisions_file_name))
-
-### since database start by health zone over time
-table_hz_over_time_decisions_file_name <- sprintf("%stable_hz_decisions_over_time.xlsx",
-                                           undated_file_name(current_goma))
-rio::export(table_hz_over_time_decisions,
-            file.path("produced_xlsx", table_hz_over_time_decisions_file_name))
-
-### past 3 weeks by health zone total
-table_hz_total_recent_decisions_file_name <- sprintf("%stable_hz_decisions_total_recent.xlsx",
-                                        undated_file_name(current_goma))
-rio::export(table_hz_total_recent_decisions,
-            file.path("produced_xlsx", table_hz_total_recent_decisions_file_name))
-
-### past 3 weeks by health zone over time 
-table_hz_over_time_recent_decisions_file_name <- sprintf("%stable_hz_decisions_over_time_recent.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_hz_over_time_recent_decisions,
-            file.path("produced_xlsx", table_hz_over_time_recent_decisions_file_name))
-
-### since database start by health area total
-table_ha_total_decisions_file_name <- sprintf("%stable_ha_decisions_total.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_ha_total_decisions_file_name,
-            file.path("produced_xlsx", table_ha_total_decisions_file_name))
-
-### since database start by health area over time
-table_ha_over_time_decisions_file_name <- sprintf("%stable_ha_decisions_over_time.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_ha_over_time_decisions,
-            file.path("produced_xlsx", table_ha_over_time_decisions_file_name))
-
-### past 3 weeks by health area total
-table_ha_total_recent_decisions_file_name <- sprintf("%stable_ha_decisions_total_recent.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_ha_total_recent_decisions,
-            file.path("produced_xlsx", table_ha_total_recent_decisions_file_name))
-
-### past 3 weeks by health area over time
-table_ha_over_time_recent_decisions_file_name <- sprintf("%stable_ha_decisions_over_time_recent.xlsx",
-                                               undated_file_name(current_goma))
-rio::export(table_ha_over_time_recent_decisions,
-            file.path("produced_xlsx", table_ha_over_time_recent_decisions_file_name))
+for (e in to_export) {
+  rio::export(get(e),
+              file.path("produced_xlsx",
+                        paste0(e, ".xlsx")))
+}
 
 ```
 
 Click on the following links to open the files (only works if the files above
 have been generated and are in the same folder as this document):
 
-**Cleaned alerts database:**
-- [cleaned_alerts_database_goma.xlsx](produced_xlsx/cleaned_alerts_database_goma.xlsx)
 
-**Alert validation databases:**
-- [alerts_goma_table_validation.xlsx](produced_xlsx/alerts_goma_table_validation.xlsx)
-- [alerts_goma_table_validation_recent.xlsx](produced_xlsx/alerts_goma_table_validation_recent.xlsx)
-- [alerts_goma_table_hz_validation_total.xlsx](produced_xlsx/alerts_goma_table_hz_validation_total.xlsx)
-- [alerts_goma_table_hz_validation_over_time.xlsx](produced_xlsx/alerts_goma_table_hz_validation_over_time.xlsx)
-- [alerts_goma_table_hz_validation_total_recent.xlsx](produced_xlsx/alerts_goma_table_hz_validation_total_recent.xlsx)
-- [alerts_goma_table_hz_validation_over_time_recent.xlsx](produced_xlsx/alerts_goma_table_hz_validation_over_time_recent.xlsx)
-- [alerts_goma_table_ha_validation_total.xlsx](produced_xlsx/alerts_goma_table_ha_validation_total.xlsx)
-- [alerts_goma_table_ha_validation_over_time.xlsx](produced_xlsx/alerts_goma_table_ha_validation_over_time.xlsx)
-- [alerts_goma_table_ha_validation_total_recent.xlsx](produced_xlsx/alerts_goma_table_ha_validation_total_recent.xlsx)
-- [alerts_goma_table_ha_validation_over_time_recent.xlsx](produced_xlsx/alerts_goma_table_ha_validation_over_time_recent.xlsx)
+```{r xlsx_links, results = "asis", eval = TRUE}
 
-**Alert origins databases:**
-- [alerts_goma_table_origins.xlsx](produced_xlsx/alerts_goma_table_origins.xlsx)
-- [alerts_goma_table_origins_recent.xlsx](produced_xlsx/alerts_goma_table_origins_recent.xlsx)
-- [alerts_goma_table_hz_origins_total.xlsx](produced_xlsx/alerts_goma_table_hz_origins_total.xlsx)
-- [alerts_goma_table_hz_origins_over_time.xlsx](produced_xlsx/alerts_goma_table_hz_origins_over_time.xlsx)
-- [alerts_goma_table_hz_origins_total_recent.xlsx](produced_xlsx/alerts_goma_table_hz_origins_total_recent.xlsx)
-- [alerts_goma_table_hz_origins_over_time_recent.xlsx](produced_xlsx/alerts_goma_table_hz_origins_over_time_recent.xlsx)
-- [alerts_goma_table_ha_origins_total.xlsx](produced_xlsx/alerts_goma_table_ha_origins_total.xlsx)
-- [alerts_goma_table_ha_origins_over_time.xlsx](produced_xlsx/alerts_goma_table_ha_origins_over_time.xlsx)
-- [alerts_goma_table_ha_origins_total_recent.xlsx](produced_xlsx/alerts_goma_table_ha_origins_total_recent.xlsx)
-- [alerts_goma_table_ha_origins_over_time_recent.xlsx](produced_xlsx/alerts_goma_table_ha_origins_over_time_recent.xlsx)
+for (e in to_export) {
+  txt <- sprintf("- [%s.xlsx](%s.xlsx)",
+                 e,
+                 file.path("produced_xlsx",
+                           e))
+  cat(txt, sep = "\n")
+}
 
-**Alert validation decisions databases:**
-- [alerts_goma_table_decisions.xlsx](produced_xlsx/alerts_goma_table_decisions.xlsx)
-- [alerts_goma_table_decisions_recent.xlsx](produced_xlsx/alerts_goma_table_decisions_recent.xlsx)
-- [alerts_goma_table_hz_decisions_total.xlsx](produced_xlsx/alerts_goma_table_hz_decisions_total.xlsx)
-- [alerts_goma_table_hz_decisions_over_time.xlsx](produced_xlsx/alerts_goma_table_hz_decisions_over_time.xlsx)
-- [alerts_goma_table_hz_decisions_total_recent.xlsx](produced_xlsx/alerts_goma_table_hz_decisions_total_recent.xlsx)
-- [alerts_goma_table_hz_decisions_over_time_recent.xlsx](produced_xlsx/alerts_goma_table_hz_decisions_over_time_recent.xlsx)
-- [alerts_goma_table_ha_decisions_total.xlsx](produced_xlsx/alerts_goma_table_ha_decisions_total.xlsx)
-- [alerts_goma_table_ha_decisions_over_time.xlsx](produced_xlsx/alerts_goma_table_ha_decisions_over_time.xlsx)
-- [alerts_goma_table_ha_decisions_total_recent.xlsx](produced_xlsx/alerts_goma_table_ha_decisions_total_recent.xlsx)
-- [alerts_goma_table_ha_decisions_over_time_recent.xlsx](produced_xlsx/alerts_goma_table_ha_decisions_over_time_recent.xlsx)
+```
 
 
+<!-- ======================================================= -->
+## R objects
+
+The following code exports all tables named in `to_report` to `rds` files,
+stored inside the folder `produced_rds`:
+
+```{r rds_exports, eval = TRUE}
+
+if (!dir.exists("produced_rds")) {
+  dir.create("produced_rds")
+}
+
+for (e in to_export) {
+  rio::export(get(e),
+              file.path("produced_rds",
+                        paste0(e, ".rds")))
+}
+
+```
+
+Click on the following links to open the files (only works if the files above
+have been generated and are in the same folder as this document):
+
+
+```{r rds_links, results = "asis", eval = TRUE}
+
+for (e in to_export) {
+  txt <- sprintf("- [%s.rds](%s.rds)",
+                 e,
+                 file.path("produced_rds",
+                           e))
+  cat(txt, sep = "\n")
+}
+
+```
 
 <!-- ======================================================= -->
 <!-- ======================================================= -->
@@ -2098,3 +1943,10 @@ sessionInfo()
 ```
 
 <!-- ======================================================= -->
+## Compilation parameters
+
+This shows which parameters were passed through `params` at compilation time:
+
+```{r params}
+params
+```
