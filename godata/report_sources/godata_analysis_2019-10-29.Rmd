@@ -1,0 +1,191 @@
+---
+title: ""
+author: "Thibaut Jombart and Sara Hollis for the epi analysis cell - EOC Goma"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: pygments
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+    toc_collapse: no
+    toc_depth: 2
+    toc_float: yes
+    css: !expr here::here('css', 'style.css')
+---
+
+
+
+<br>
+
+<div class="report_meta">
+  <span class="notice">**Notice**: this is a **stable, routine report**. 
+  **Do not touch it unless it is broken.** To make a contribution, **carefully read 
+  the [README](../../../../../README.html) file**.</span>
+  
+  **Maintainer:** Thibaut Jombart (thibautjombart@gmail.com)
+  
+  **Code contributors:** Sara Hollis, Thibaut Jombart, Amy Gimma
+  
+  **Data contributors:** Yannick Tutu, Richie Ngombo
+  
+  **Version:** 1.0.0
+  
+  **Reviewed by:** 
+</div>
+
+
+
+
+
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This report produces basic epicurves by dates of onset or reporting, with
+various stratification, from the cleaned Master linelist database.
+
+### Data used
+
+This report uses the latest cleaned Master linelist data.
+
+### Method
+
+The data preparation involves the following steps, detailed in the following
+tabs:
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc.
+
+* **Add new variables**: addition of new variables to the Master linelist database, like top
+  affected health zones.
+
+* **Filter the data**: keep only relevant confirmed and probable cases, possibly
+  removing erroneous dates, for further analysis
+
+
+
+<!-- ====================================================== -->
+## Load scripts
+
+These scripts will load:
+
+* all local scripts, stored as `.R` filesinside `/scripts/`
+* all global scripts, i.e. stored outside the factory in `../scripts/`
+* the path to the cleaned MDC data stored as `x`
+
+**Important**: we need to make sure the soucing of `R` scripts is done using the
+current environment, using the argument `local = TRUE`. This is in particular
+essential when `params` is used, as some functions and settings are dependent
+upon it.
+
+```{r read_scripts}
+
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$", full.names=TRUE)
+for (file in scripts_files) source(file, local = TRUE)
+
+ggthemr("grape")
+
+## show parameters
+params
+
+```
+
+
+
+
+<!-- ====================================================== -->
+## Load data
+
+We extract the completion date from the file name:
+
+```{r load_data}
+
+current_clean_data
+x <- rio::import(current_clean_data)
+
+file_name <- gsub("^[^.]+/", "", current_clean_data)
+database_date <- file_name %>%
+  guess_dates()
+database_date
+
+```
+
+The **completion date** of the database is **`r format(database_date, format =
+"%A %d %b %Y")`**.
+
+
+
+
+
+
+
+
+
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+
+# System information {.tabset .tabset-fade .tabset-pills}
+
+The following information documents the system on which the document was
+compiled.
+
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+R.version
+```
+
+
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+sessionInfo()
+```
+
+
+### Change log:
+
+#### Version 2.1.0
+
+* added new variable names
+* set color scale for zone de sante across document
+* fixed spelling mistakes
+* changed table and figure names as appropriate ("last 21 days" to "recent onset")
+* added figures and tables for top recent onset ZS, daily for the last 3 months
+* exported new table
+
+### To do: 
+* check use of epiweek_onset_label (lolwa?)
+* rename variables (last_21_days)
+* describe 21 (or other timeframe) days more clearly in text
+* add table and fig for "top ZS recent report" data
+* decide on "recent" timeframe
+* decide on plot timeline in days for daily plots (63 days?)
+* review with Thibaut
+* decide maintainer
