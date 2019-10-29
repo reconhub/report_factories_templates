@@ -37,11 +37,11 @@ knitr::opts_chunk$set(echo = TRUE,
 
 ## Outline
 
-This is the universal cleaning script for master linelist database.
+Creates graphical overviews of the active health areas over time
 
 ### Data used
 
-Input data is the master linelist with one row per case. 
+Input data is the master linelist with one row per case.
 **All input files must be `xlsx` files.**
 
 ### Method
@@ -72,7 +72,6 @@ These scripts will load:
 path_to_scripts <- here::here("scripts")
 scripts_files <- dir(path_to_scripts, pattern = ".R$", full.names = TRUE)
 for (file in scripts_files) source(file, local = TRUE)
-
 
 ggthemr("pale")
 ```
@@ -127,6 +126,7 @@ aire_de_sante_info %>%
 
 ```
 
+
 <!-- ================================= -->
 <!-- ================================= -->
 <!-- ================================= -->
@@ -139,7 +139,7 @@ Daily incidence is computed for health areas using `incidence`, and will later b
 
 ```{r incidence by health area}
 
-inc <- with(x, incidence(date_report, groups = aire_de_sante))
+incindence_obj <- with(x, incidence(date_report, groups = aire_de_sante))
 
 ```
 
@@ -150,26 +150,30 @@ Here we compute the number of active health areas per day, for the entire time p
 
 
 ```{r active health areas}
-
-inc_df <- as.data.frame(inc, long = TRUE) %>% 
+incidence_df <- as.data.frame(incindence_obj, long = TRUE) %>% 
   rename(aire_de_sante = groups) %>% 
-  left_join(aire_de_sante_info) 
+  left_join(aire_de_sante_info)
 
 timewindow <- 21
 
-nb_as_active <- inc_df %>%
+nb_as_active <- incidence_df %>%
   group_by(aire_de_sante) %>%
   mutate(
-      cases_last_21_days =zoo::rollsum(counts,
+      cases_last_21_days = zoo::rollsum(counts,
                                    timewindow,
                                    align = "right",
                                    fill = NA),
-    has_cases = (cases_last_21_days > 0)
-     ) %>%
+      has_cases = (cases_last_21_days > 0)
+  ) %>%
   group_by(dates, sous_coordination) %>% 
-  summarise(n_active_areas = sum(has_cases))
- 
+  summarise(n_active_areas = sum(has_cases)) %>%
+  replace_na(
+    list(n_active_areas = 0)
+    )
+```
 
+
+```{r active health areas plot}
 ggplot(nb_as_active) +
   geom_col(aes(x = dates, y = n_active_areas,
                fill = sous_coordination),
@@ -180,21 +184,17 @@ ggplot(nb_as_active) +
                  "notifié dans les 21 derniers jours",
                  sep = "\n")) +
   scale_x_date(date_breaks = "1 month") +
-  theme(legend.position = c(0.25, 0.85)) +
-  scale_fill_discrete("Sous-coordination") +
+  theme(legend.position = c(0.2, 0.8)) +
+  ggsci::scale_fill_d3(name = "Sous-coordination") +
   guides(fill = guide_legend(ncol = 2)) +
   large_txt +
   rotate_x_text(45)
-
 ```
 
-```{r number as active}
-nb_as_active %>% 
-  group_by(dates, sous_coordination) %>% 
-  summarise(n = sum(n_active_areas, na.rm = TRUE)) %>% 
-  filter(!is.na(n), !sous_coordination %in% "other_unknown") %>%
-  ggplot() +
-  aes(x = dates, y = n, fill = sous_coordination, width = 1) +
+
+```{r active health areas plot facet}
+ggplot(nb_as_active) +
+  aes(x = dates, y = n_active_areas, fill = sous_coordination, width = 1) +
   geom_col() +
   labs(
     title = "Nombre d'aires de santé actives au cours du temps",
@@ -206,36 +206,35 @@ nb_as_active %>%
         sep = "\n"
       )
   ) +
-  scale_x_date(date_breaks = "2 month") +
+  scale_x_date(date_breaks = "3 month") +
   theme(legend.position = "none") +
-  scale_fill_discrete("Sous-coordination") +
-  guides(fill = guide_legend(ncol = 2)) +
+  ggsci::scale_fill_d3(name = "Sous-coordination") +
   large_txt +
   rotate_x_text(45) +
-  # theme(axis.text.x = element_text(size = 6, angle = 90, hjust = .5)) +
-  facet_wrap(~ sous_coordination)
+  facet_wrap(~ sous_coordination, ncol = 3)
 ```
 
 ```{r as active table}
 nb_as_active %>%
   show_table()
-
 ```
 
 ## Current active areas - 21 days
-In this part we identify health areas active on the date of completion of the database, and report the number of cases over the last 21 days, i.e. from the **`r database_date-21`** to the **`r database_date`**.
 
+In this part we identify health areas active on the date of completion of the database, and report the number of cases over the last 21 days, i.e. from the **`r database_date-20`** to the **`r database_date`**.
 
-```{r current active areas}
+```{r current active areas 21d}
 
-current_active <- x %>%
+current_active_ha_21_d <- x %>%
   group_by(aire_de_sante) %>%
-  summarise(n_cases_21_days = sum(date_report > (database_date - 20))) %>%
+  summarise(n_cases_21_days = sum(date_report >= (database_date - 20))) %>%
   filter(n_cases_21_days > 0) %>% 
   left_join(aire_de_sante_info)
 
 
-ggplot(current_active, aes(x = aire_de_sante, y = n_cases_21_days)) +
+ggplot(current_active_ha_21_d,
+       aes(x = aire_de_sante, y = n_cases_21_days)
+       ) +
   geom_col(aes(fill = sous_coordination)) +
   facet_grid(. ~ sous_coordination,
              scales = "free_x",
@@ -247,7 +246,7 @@ ggplot(current_active, aes(x = aire_de_sante, y = n_cases_21_days)) +
                                    vjust = 0.5,
                                    hjust = 1,
                                    size = 11)) +
-  scale_fill_discrete("") +
+  ggsci::scale_fill_d3(name = "") +
   labs(title = sprintf("Aires de santé actives au %s",
                        format(database_date, "%d %b %Y")),
        x = "",
@@ -256,26 +255,29 @@ ggplot(current_active, aes(x = aire_de_sante, y = n_cases_21_days)) +
 ```
 
 
-```{r current active table}
-
-current_active %>%
+```{r current active table 21d}
+current_active_ha_21_d %>%
   show_table()
-
 ```
 
+
+
 ## Current active areas - 7 days
-In this part we identify health areas active on the date of completion of the database, and report the number of cases over the last 7 days, i.e. from the **`r database_date-7`** to the **`r database_date`**.
 
-```{r current active areas past 7 days}
+In this part we identify health areas active on the date of completion of the database, and report the number of cases over the last 7 days, i.e. from the **`r database_date-6`** to the **`r database_date`**.
 
-current_active_7_days <- x %>%
+```{r current active areas 7d}
+
+current_active_ha_7_d <- x %>%
   group_by(aire_de_sante) %>%
-  summarise(n_cases_7_days = sum(date_report > (database_date - 7))) %>%
+  summarise(n_cases_7_days = sum(date_report >= (database_date - 6))) %>%
   filter(n_cases_7_days > 0) %>% 
   left_join(aire_de_sante_info)
 
 
-ggplot(current_active_7_days, aes(x = aire_de_sante, y = n_cases_7_days)) +
+ggplot(current_active_ha_7_d,
+       aes(x = aire_de_sante, y = n_cases_7_days)
+       ) +
   geom_col(aes(fill = sous_coordination)) +
   facet_grid(. ~ sous_coordination,
              scales = "free_x",
@@ -287,22 +289,18 @@ ggplot(current_active_7_days, aes(x = aire_de_sante, y = n_cases_7_days)) +
                                    vjust = 0.5,
                                    hjust = 1,
                                    size = 11)) +
-  scale_fill_discrete("") +
+  ggsci::scale_fill_d3(name = "") +
   labs(title = sprintf("Aires de santé actives au %s",
                        format(database_date, "%d %b %Y")),
        x = "",
        y = "Nombre de cas au cours des 7 derniers jours")
+
 ```
 
 
-```{r current active table 7 days}
-
-current_active_7_days %>%
+```{r current active table 7d}
+current_active_ha_7_d %>%
   show_table()
-
-```
-
-
 ```
 
 
@@ -312,25 +310,40 @@ We export some of the relevant tables, which will be placed in the current worki
 
 ```{r export_xlsx}
 
+## create the produced_xlsx folder if it does not exist
 if (!dir.exists("produced_xlsx")) {
   dir.create("produced_xlsx")
 }
 
-rio::export(inc_df,
-            file.path("produced_xlsx",
-                      "incidence_data_frame.xlsx"))
+## vector of names of tables to export
+## (these need to be existing data.frames or tibbles)
+to_export <- c("current_active_ha_21_d",
+               "current_active_ha_7_d",
+               "nb_as_active",
+               "incidence_df")
 
-rio::export(nb_as_active,
-            file.path("produced_xlsx",
-                      "active_health_areas_21_days.xlsx"))
-
-rio::export(current_active,
-            file.path("produced_xlsx",
-                      "current_active_health_areas.xlsx"))
+## export all files
+for (e in to_export) {
+  rio::export(get(e),
+              file.path("produced_xlsx",
+                        paste0(e, ".xlsx")))
+}
 
 ```
 
+Files created:
 
+```{r echo = FALSE, results = "asis"}
+## note: for this to work, use the options `results = "asis"` and
+## `echo = FALSE` in the code chunk header
+for (e in to_export) {
+  txt <- sprintf("- [%s.xlsx](%s.xlsx)",
+                 e,
+                 file.path("produced_xlsx",
+                           e))
+  cat(txt, sep = "\n")
+}
+```
 
 
 # System information {.tabset .tabset-fade .tabset-pills}
@@ -362,3 +375,11 @@ This provides information on the packages used:
 ```{r R_pkg}
 sessionInfo()
 ```
+
+
+## Parameters for report compilation
+
+```{r params}
+params
+```
+
