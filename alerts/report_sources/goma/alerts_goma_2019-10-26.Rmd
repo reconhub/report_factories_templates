@@ -345,7 +345,7 @@ x <- x %>%
 
 
 <!-- ======================================================= -->
-## Population data
+## Add population data
 
 Load the population data
 
@@ -367,7 +367,7 @@ pop_data <- pop_data %>%
 
 ## load the data
 pop_data <- pop_data %>% 
-  filter(!aire_de_sante %in% x$aire_de_sante & !zone_de_sante %in% x$zone_de_sante)
+  filter(aire_de_sante %in% x$aire_de_sante & zone_de_sante %in% x$zone_de_sante)
 
 pop_data
 
@@ -390,13 +390,54 @@ x <- x %>%
   left_join(zone_de_sante_pop, 
             by = c("zone_de_sante")) 
   
-if(!allNA(x1$as_population)){
+if(!allNA(x$as_population)){
   x <-   x %>% 
     mutate(total_population = total_population)
 }
 
 
 ```
+
+
+<!-- ======================================================= -->
+## Check population linkage (review regularly)
+
+```{r check_population_linkage}
+
+# Calculating number of individuals successfully linked to population data
+number_individuals <- nrow(x)
+number_individuals_aire_linked <- sum(!is.na(x$as_population))
+prop_linked <- sum(number_individuals_aire_linked / number_individuals)
+
+# Compare these two quantities - ensure there aren't any mispellings we're missing
+table(x$aire_de_sante[!number_individuals]) # aire de santes in database we're not matching
+
+# Identifying Aire de Santes with missing population data
+goma_ha_pop <- pop_data$population
+index <- which(is.na(goma_ha_pop))
+non_pop_data <- pop_data$aire_de_sante[index]
+
+# Identifying number of alerts linked to Aire de Sante with 
+# missing population data
+alerts_no_pop <- sum(x$aire_de_sante %in% non_pop_data)
+
+```
+
+For the Goma Alerts Database, **`r round(100 * prop_linked, 2)`%** of individuals 
+(`r number_individuals_aire_linked` / `r number_individuals`) had a legitimate Aire 
+de Sante belonging to Goma inputted - the remainder had Aire de Santes which either
+do not belong to Goma or are not an Aire de Sante. **`date_na`** alerts were removed
+for an invalid date.
+<!-- REVIEW: invalid dates removed ^ -->
+
+**Note:** Population data is unavailable for the aire de santes of 
+**`r non_pop_data`** which are not present in the population database. These
+Aire de Santes make up **`r alerts_no_pop`** alerts. 
+
+**Note:** These analyses **CANNOT** detect legitimate Aire de Santes missing 
+from the geographical/population database. If any of these are identified as
+missing, they must be manually added to the database so that they can be
+incorporated into the analyses presented here. 
 
 <!-- ======================================================= -->
 ## Expected decisions
@@ -1841,6 +1882,46 @@ table_ha_over_time_recent_decisions %>%
   
 ```
 
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# Alert Rates {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This section integrates information on the number of alerts with population data to estimate the number of validated/invalidated alerts per 10,000 people.
+
+**Note:** Population data is unavailable for the Aire de Santes of 
+**`r non_pop_data`** which are not present in the population database. These
+Aire de Santes make up **`r alerts_no_pop`** alerts, which are included in
+the calculations for Sous-Coordination and Zone de Sante. It might be worth 
+excluding alerts belonging to these Aire de Santes when it comes to these
+calculations. Underestimatd otherwise. **TO CHECK**
+
+**Note:** Similarly, the "Other" group for `top_zones` and `top_aires` is not
+presented in this section as this is an amalgamation of different places, some 
+of which lack reliable (or even any) population data. 
+
+**Note: The Top 3 Health Zones and all Valid Aire de Santes that have reported**
+**alerts at any point are plotted when considering totals by geographical area**
+**(aggregated over time). The Top 3 Health Zones and the Top 14 Aire de Santes**
+**are plotted when it comes to plotting over time (due to space constraints).**
+
+
+```{r reactivate_alert_rates, include = FALSE}
+
+if(!allNA(x$as_population)){
+  knitr::opts_chunk$set(eval = FALSE)
+  no_pop_data <- TRUE
+} else{
+  cat("There is no population data therefore alert rates can not be calculated.")
+}
+
+
+
+```
 
 
 
