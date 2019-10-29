@@ -26,12 +26,34 @@ knitr::opts_chunk$set(echo = TRUE,
                       fig.path = "figures/")
 ```
 
+
+<br>
+
+**Maintainer:** Your Name (your_email@something.com)
+
+**Code contributors:** Thibaut Jombart, Chris Jarvis
+
+**Data contributors:** Name of contributors
+
+**Version:** 1.0.0 
+
+**Reviewed by:** recommended, but only required for routine reports
+
+**Notice**: this is a **stable, routine report**. **Do not touch it unless it is
+broken.** To make a contribution, carefully read the
+[README](../../../../../README.html) file.
+
+
+
+
 <!-- ======================================================= -->
 <!-- ======================================================= -->
 <!-- ======================================================= -->
 
 # Data preparation {.tabset .tabset-fade .tabset-pills}
 
+
+<!-- ======================================================= -->
 ## Outline
 
 This report cleans and analyses the alert data of Goma. Input comes from an
@@ -74,6 +96,7 @@ ggthemr("fresh")
 
 ```
 
+<!-- ======================================================= -->
 ## Load alerts data
 
 We extract the completion date from the file name:
@@ -96,7 +119,7 @@ database_date
 The **completion date** of the database is **`r format(database_date, format =
 "%A %d %b %Y")`**.
 
-
+<!-- ======================================================= -->
 ## Clean data
 
 We use *linelist*'s function `clean_data()` to:
@@ -124,7 +147,7 @@ x <- x_raw %>%
 
 ```
 
-
+<!-- ======================================================= -->
 ## Renaming variables and sanity checks
 
 The following variables will be used, and are therefore checked:
@@ -178,6 +201,7 @@ x <- x %>%
 
 ```
 
+<!-- ======================================================= -->
 ## Variable creation
 
 The following variables are created: 
@@ -247,7 +271,7 @@ x <- x %>%
 
 ```
 
-
+<!-- ======================================================= -->
 ## Outcomes
 
 Outcome is defined for alerts which have either been validated or invalidated.
@@ -262,7 +286,7 @@ outcomes <- x %>%
 
 ```
 
-
+<!-- ======================================================= -->
 ## Expected decisions
 
 Alerts are supposed to be validated using the following key, depending on
@@ -371,7 +395,7 @@ outcomes %>%
 
 ```
 
-
+<!-- ======================================================= -->
 ## Last 21 days
 
 We duplicate the previous datasets, retaining the 21 days leading up to the
@@ -385,7 +409,7 @@ outcomes_recent <- filter(outcomes, date >= start_date)
 
 ```
 
-
+<!-- ======================================================= -->
 ## Custom color scales
 
 We define custom colors for some of the variables used in the plots.
@@ -429,9 +453,9 @@ scale_validations <- scale_fill_manual(
 <!-- ======================================================= -->
 <!-- ======================================================= -->
 
-
 # Validation status {.tabset .tabset-fade .tabset-pills}
 
+<!-- ======================================================= -->
 ## Outline
 
 This section summarises alerts over time according to their validation status i.e. whether they were validated or invalidated.
@@ -441,6 +465,7 @@ This section summarises alerts over time according to their validation status i.
 **(aggregated over time). The Top 3 Health Zones and the Top 14 Aire de Santes**
 **are plotted when it comes to plotting over time (due to space constraints).**
 
+<!-- ======================================================= -->
 ## Overall 
 
 ### Weekly, since database start
@@ -475,6 +500,7 @@ table_validation_overall_time %>%
   
 ```
 
+<!-- ======================================================= -->
 ## Overall past 3 weeks
 
 ### Daily, past 3 weeks
@@ -508,6 +534,7 @@ table_validation_overall_past_3_weeks %>%
   
 ```
 
+<!-- ======================================================= -->
 ## Overall proportion validated
 
 ```{r sous_co_proportion_validated}
@@ -538,6 +565,7 @@ ggplot(x_prop, aes(x = epiweek_report_label, col = "#D56F3E")) +
 ```
 
 
+<!-- ======================================================= -->
 ## Health Zone 
 
 ### Total since database start
@@ -605,6 +633,7 @@ table_hz_over_time_validation %>%
 ```
 
 
+<!-- ======================================================= -->
 ## Health Zone - past 3 weeks
 
 ### Total past 3 weeks
@@ -673,6 +702,7 @@ table_hz_over_time_recent_validation %>%
   
 ```
 
+<!-- ======================================================= -->
 ## Health Area 
 
 ### Total since database start
@@ -752,6 +782,7 @@ table_ha_over_time_validation %>%
 
 
 
+<!-- ======================================================= -->
 ## Health Area - past 3 weeks
 
 ### Total past 3 weeks
@@ -840,9 +871,12 @@ table_ha_over_time_recent_validation %>%
 ```
 
 
-
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
 # Origins {.tabset .tabset-fade .tabset-pills}
 
+<!-- ======================================================= -->
 ## Outline
 
 This section summarises alerts over time according to their origin 
@@ -853,6 +887,7 @@ This section summarises alerts over time according to their origin
 **are plotted when it comes to plotting over time (due to space constraints).**
 
 
+<!-- ======================================================= -->
 ## Overall
 
 ### Weekly, since database start
@@ -888,6 +923,7 @@ table_origins %>%
   
 ```
 
+<!-- ======================================================= -->
 ## Overall past 3 weeks
 
 ### Daily, past 3 weeks
@@ -925,6 +961,7 @@ table_origins_recent %>%
   
 ```
 
+<!-- ======================================================= -->
 ## Health Zone 
 
 ### Total since database start
@@ -992,6 +1029,7 @@ table_hz_over_time_origins %>%
   
 ```
 
+<!-- ======================================================= -->
 ## Health Zone - Past 3 Weeks
 
 ### Total past 3 weeks
@@ -1060,6 +1098,7 @@ table_hz_over_time_recent_origins %>%
   
 ```
 
+<!-- ======================================================= -->
 ## Health Area 
 
 ### Total since database start
@@ -1141,6 +1180,7 @@ table_ha_over_time_origins %>%
 ```
 
 
+<!-- ======================================================= -->
 ## Health Area - past 3 weeks
 
 ### Total past 3 weeks
@@ -1227,8 +1267,12 @@ table_ha_over_time_recent_origins %>%
 ```
 
 
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
 # Validation decisions {.tabset .tabset-fade .tabset-pills}
 
+<!-- ======================================================= -->
 ## Outline
 
 This section focuses on the decision of alerts, by health zones.
@@ -1253,6 +1297,7 @@ on the patient and community. **False negative** create a risk of missing cases.
 **(aggregated over time). The top 3 Health Zones and the top 14 Aire de Santes**
 **are plotted when it comes to plotting over time (due to space constraints).**
 
+<!-- ======================================================= -->
 ## Overall
 
 ### Weekly, since database start
@@ -1333,6 +1378,7 @@ table_sens_spec %>%
 **Note:** The `incorrectly validated` variable will be over-estimated if alerts forms are poorly documented/incomplete - i.e. if patients had symptoms not reported in the form but that were used in the decision making process. 
 
 
+<!-- ======================================================= -->
 ## Overall past 3 weeks
 
 ### Daily, past 3 weeks
@@ -1369,6 +1415,7 @@ table_decisions_recent %>%
 ```
 
 
+<!-- ======================================================= -->
 ## Health Zone 
 
 ### Total since database start
@@ -1435,6 +1482,7 @@ table_hz_over_time_decisions %>%
   
 ```
 
+<!-- ======================================================= -->
 ## Health Zone - past 3 weeks
 
 ### Total past 3 weeks
@@ -1502,6 +1550,7 @@ table_hz_over_time_recent_decisions %>%
 ```
 
 
+<!-- ======================================================= -->
 ## Health Area 
 
 ### Total since database start
@@ -1583,6 +1632,7 @@ table_ha_over_time_decisions %>%
 ```
 
 
+<!-- ======================================================= -->
 ## Health Area - past 3 weeks
 
 ### Total past 3 weeks
@@ -1671,6 +1721,9 @@ table_ha_over_time_recent_decisions %>%
 
 
 
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
 # Export data and tables  {.tabset .tabset-fade .tabset-pills}
 
 
@@ -1678,11 +1731,13 @@ table_ha_over_time_recent_decisions %>%
 knitr::opts_chunk$set(eval = TRUE)
 ```
 
+<!-- ======================================================= -->
 ## Outline
 
 We export the clean data to the clean data folder and some of the relevant tables, which will be placed in the current
 working directory.
 
+<!-- ======================================================= -->
 ## R objects
 
 We export some of the clean database, placed in `produced_rds/` as well as in
@@ -1724,6 +1779,7 @@ file.copy(from = file.path("produced_rds", rds_file_name),
 ```
 
 
+<!-- ======================================================= -->
 ## Excel files
 
 ```{r exports, eval = TRUE}
@@ -2006,12 +2062,14 @@ have been generated and are in the same folder as this document):
 
 # System information {.tabset .tabset-fade .tabset-pills}
 
+<!-- ======================================================= -->
 ## Outline
 
 The following information documents the system on which the document was
 compiled.
 
 
+<!-- ======================================================= -->
 ## System 
 
 This provides information on the operating system.
@@ -2020,6 +2078,7 @@ This provides information on the operating system.
 Sys.info()
 ```
 
+<!-- ======================================================= -->
 ## R environment
 
 This provides information on the version of R used:
@@ -2029,6 +2088,7 @@ R.version
 ```
 
 
+<!-- ======================================================= -->
 ## R packages
 
 This provides information on the packages used:
@@ -2036,3 +2096,5 @@ This provides information on the packages used:
 ```{r R_pkg}
 sessionInfo()
 ```
+
+<!-- ======================================================= -->
