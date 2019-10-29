@@ -787,6 +787,8 @@ table_ha_over_time_validation %>%
 
 ### Total past 3 weeks
 
+Areas with less than 20 alerts removed from graph but kept in table. 
+
 ``` {r health_area_total_recent, fig.width = 14}
 
 x_validations <- x %>%
@@ -1103,6 +1105,8 @@ table_hz_over_time_recent_origins %>%
 
 ### Total since database start
 
+Areas with less than 100 alerts removed from graph but kept in table. 
+
 ``` {r health_area_total_origins, fig.width = 14}
 
 x_origins <- x %>%
@@ -1184,6 +1188,8 @@ table_ha_over_time_origins %>%
 ## Health Area - past 3 weeks
 
 ### Total past 3 weeks
+
+Areas with less than 20 alerts removed from graph but kept in table. 
 
 ``` {r health_area_total_recent_origin, fig.width = 14}
 
@@ -1555,6 +1561,8 @@ table_hz_over_time_recent_decisions %>%
 
 ### Total since database start
 
+Only area with at least 100 alerts are presented in the graph all areas are presented in the table. 
+
 ``` {r health_area_total_decisions, fig.width = 14}
 
 x_decisions <- outcomes %>%
@@ -1636,6 +1644,8 @@ table_ha_over_time_decisions %>%
 ## Health Area - past 3 weeks
 
 ### Total past 3 weeks
+
+Only area with atleast than 20 alerts are presented in the graph all areas are presented in the table. 
 
 ``` {r health_area_total_recent_decision, fig.width = 14}
 
