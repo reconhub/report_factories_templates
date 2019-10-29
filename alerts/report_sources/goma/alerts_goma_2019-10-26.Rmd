@@ -333,8 +333,70 @@ table_unknown_as %>%
 
 ```
 
+<!-- ======================================================= -->
+## Filter to known aire de santes
+
+```{r known_aire_de_sante}
+
+x <- x %>% 
+  filter(aire_de_sante %in% as_names)
+
+```
 
 
+<!-- ======================================================= -->
+## Population data
+
+Load the population data
+
+```{r load_pop_data}
+
+## load the data
+current_pop 
+pop_data <- rio::import(current_pop)
+glimpse(pop_data)
+
+pop_data <- pop_data %>%
+  clean_data(guess_dates = FALSE) %>%
+  as_tibble()
+```
+
+### Check for area not in alerts
+
+```{r filter_by_alerts}
+
+## load the data
+pop_data <- pop_data %>% 
+  filter(!aire_de_sante %in% x$aire_de_sante & !zone_de_sante %in% x$zone_de_sante)
+
+pop_data
+
+## aire de sante population
+aire_de_sante_pop <- pop_data %>%
+  mutate(as_population = population) %>%
+  select(zone_de_sante, aire_de_sante, as_population)
+
+## zone de sante population
+zone_de_sante_pop <- pop_data %>%
+  group_by(zone_de_sante) %>%
+  summarise(zs_population = sum(population, na.rm = TRUE))
+
+total_population <- sum(unique(pop_data$population), na.rm = TRUE)
+
+## adding populations to main data
+x <- x %>%
+  left_join(aire_de_sante_pop, 
+            by = c("aire_de_sante", "zone_de_sante")) %>%
+  left_join(zone_de_sante_pop, 
+            by = c("zone_de_sante")) 
+  
+if(!allNA(x1$as_population)){
+  x <-   x %>% 
+    mutate(total_population = total_population)
+}
+
+
+```
 
 <!-- ======================================================= -->
 ## Expected decisions
