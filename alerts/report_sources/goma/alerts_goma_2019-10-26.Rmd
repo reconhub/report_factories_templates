@@ -96,6 +96,7 @@ ggthemr("fresh")
 
 ```
 
+
 <!-- ======================================================= -->
 ## Load alerts data
 
@@ -287,6 +288,55 @@ outcomes <- x %>%
 ```
 
 <!-- ======================================================= -->
+## Check admin areas are correct
+
+```{r load_area_names_data}
+
+## load the data
+current_spatial
+area_names <- rio::import(current_spatial) %>%
+  clean_data(guess_dates = FALSE)
+
+as_names <- unique(area_names$as)
+zs_names <- unique(area_names$zs)
+
+```
+
+### Identify unknown areas  
+
+```{r identify_area_names_data}
+
+## load the data
+n_rows <- nrow(x)
+
+unknown_as <- x %>% 
+  filter(!aire_de_sante %in% as_names)
+
+most_recent_unknown_as <- max(unknown_as$date, na.rm = T)
+
+start_date <- database_date - 21
+unknown_as_3weeks <- x %>% 
+  filter(!aire_de_sante %in% as_names & date >= start_date)
+
+```
+
+
+There are `r nrow(unknown_as)` unknown aire de santes with the latest being `r most_recent_unknown_as`. There are `r nrow(unknown_as_3weeks)` alerts with an unknown aire de santes in the database.
+
+```{r show_unknown_area_names}
+
+table_unknown_as <- unknown_as %>% 
+  count(zone_de_sante, aire_de_sante) 
+  
+table_unknown_as %>% 
+  show_table()
+
+```
+
+
+
+
+<!-- ======================================================= -->
 ## Expected decisions
 
 Alerts are supposed to be validated using the following key, depending on
@@ -394,6 +444,7 @@ outcomes %>%
 
 
 ```
+
 
 <!-- ======================================================= -->
 ## Last 21 days
@@ -1844,7 +1895,8 @@ to_export <- c("table_validation_overall_time",
                "table_ha_total_decisions",
                "table_ha_over_time_decisions",
                "table_ha_total_recent_decisions",
-               "table_ha_over_time_recent_decisions")
+               "table_ha_over_time_recent_decisions",
+               "table_unknown_as")
                
 ```
 

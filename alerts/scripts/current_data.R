@@ -12,3 +12,9 @@ current_goma <- get_latest_data("alerts_goma", raw_folder)
 ## current_komanda <- get_latest_data("^alerts_komanda.*.xlsx", raw_folder)
 ## current_aggregated <- get_latest_data("alerts_aggregated", raw_folder)
 
+
+## For spatial checks
+current_spatial <- here::here("data",
+                              "raw",
+                              "pcode_zsas_pcode_2019-10-29.xlsx")
+
