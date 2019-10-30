@@ -26,9 +26,9 @@ output:
   
   **Maintainer:** Thibaut Jombart (thibautjombart@gmail.com)
   
-  **Code contributors:** Sara Hollis, Thibaut Jombart, Amy Gimma
+  **Code contributors:** Sara Hollis, Thibaut Jombart
   
-  **Data contributors:** Yannick Tutu, Richy Ngombo
+  **Data contributors:** GoData team Beni
   
   **Version:** 1.0.0
   
@@ -115,9 +115,7 @@ We extract the completion date from the file names, for:
 
 2. contacts data
 
-3. relationships between cases data
-
-4. relationships between contacts data
+3. relationships between cases and contacts
 
 
 ```{r load_data}
@@ -135,14 +133,8 @@ contacts <- custom_import(contacts_file) %>%
 
 
 ## step 3
-cases_relationships_file
-cases_relationships <- custom_import(cases_relationships_file) %>%
-  as_tibble()
-
-
-## step 4
-contacts_relationships_file
-contacts_relationships <- custom_import(contacts_relationships_file) %>%
+relationships_file
+relationships <- custom_import(relationships_file) %>%
   as_tibble()
 
 ```
@@ -182,8 +174,7 @@ ascii match.
 ## standardise all data
 cases <- clean_data(cases, guess_dates = FALSE)
 contacts <- clean_data(contacts, guess_dates = FALSE)
-cases_relationships <- clean_data(cases_relationships, guess_dates = FALSE)
-contacts_relationships <- clean_data(contacts_relationships, guess_dates = FALSE)
+relationships <- clean_data(relationships, guess_dates = FALSE)
 
 ```
   
@@ -201,7 +192,8 @@ where necessary using `guess_dates`.
 cases <- cases %>%
   mutate(date_of_reporting = guess_dates(date_of_reporting),
          date_of_onset = guess_dates(date_of_onset),
-         date_of_outcome = guess_dates(date_of_outcome))
+         date_of_outcome = guess_dates(date_of_outcome),
+         date_of_infection = guess_dates(date_of_infection))
 
 ```
 
@@ -268,31 +260,47 @@ if (!dir.exists("produced_rds")) {
   dir.create("produced_rds")
 }
 
-## create the text for the file name with the database date
-cases_rds_file_name <- sprintf("%sclean_%s.rds",
-                         undated_file_name(cases_file),
-                         format(database_date, "%Y-%m-%d"))
-cases_rds_file_name
+## export cases file
+cases_rds_file_name <- sprintf(
+    "%sclean_%s.rds",
+    undated_file_name(cases_file),
+    format(database_date, "%Y-%m-%d"))
 
-## save the rds file in the produced_rds folder
+cases_rds_file_name
 rio::export(cases,
             file.path("produced_rds", cases_rds_file_name))
+
+
+## export cases relationships file
+relationships_rds_file_name <- sprintf(
+    "%sclean_%s.rds",
+    undated_file_name(relationships_file),
+    format(database_date, "%Y-%m-%d"))
+
+relationships_rds_file_name
+rio::export(relationships,
+            file.path("produced_rds", relationships_rds_file_name))
+
 
 ```
 
 We copy these files to the `data/clean` folder:
 
 ```{r copy_rds}
-# copy some files into `data/clean/`
 
-# Provide the destination of where to copy the data
-destination <- here("data",
-                    "clean",
-                    cases_rds_file_name)
-# Copy the rds data
-file.copy(from = file.path("produced_rds", cases_rds_file_name),
-          to = destination,
-          overwrite = TRUE)
+## loop over files to copy
+
+files <- c(cases_rds_file_name,
+           relationships_rds_file_name)
+
+for (e in files) {
+  destination <- here("data",
+                      "clean",
+                      e)
+  file.copy(from = file.path("produced_rds", e),
+            to = destination,
+            overwrite = TRUE)
+}
 
 ```
 
@@ -317,12 +325,20 @@ txt <- sprintf("\n## This file was last updated on the: %s\n",
                Sys.time())
 cat(txt, file = script_destination, append = TRUE)
 
-## actual content of the script
+## add to script: cases file
 txt <- sprintf('\ncurrent_clean_cases <- here::here("data",
                                   "clean",
                                   "%s")',
                cases_rds_file_name)
 cat(txt, file = script_destination, append = TRUE)
+
+## add to script: relationships file
+txt <- sprintf('\ncurrent_clean_relationships <- here::here("data",
+                                                "clean",
+                                                "%s")',
+               relationships_rds_file_name)
+cat(txt, file = script_destination, append = TRUE)
+
 
 ```
 
@@ -369,7 +385,7 @@ sessionInfo()
 #### Version 1.0.0
 
 * first version
-* reads in: *cases*, *contacts*, *cases_relationships*, *contacts_relationships*
+* reads in: *cases*, *contacts*, *relationships*
 * standardise data (lower case, no accents, clean separators etc.)
 * convert dates used in other reports
 * adds variables (epiweek, top zones)
