@@ -17,6 +17,7 @@ output:
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
                       collapse = TRUE,
                       fig.width = 8,
                       fig.height = 6, 
@@ -321,7 +322,7 @@ unknown_as_3weeks <- x %>%
 ```
 
 
-There are `r nrow(unknown_as)` unknown aire de santes with the latest being `r most_recent_unknown_as`. There are `r nrow(unknown_as_3weeks)` alerts with an unknown aire de santes in the database.
+There are `r nrow(unknown_as)` unknown aire de santes with the latest being `r most_recent_unknown_as`. There are `r nrow(unknown_as_3weeks)` alerts in the last 3 weeks with an unknown aire de santes in the database.
 
 ```{r show_unknown_area_names}
 
@@ -1912,17 +1913,341 @@ of which lack reliable (or even any) population data.
 
 ```{r reactivate_alert_rates, include = FALSE}
 
-if(!allNA(x$as_population)){
+if(allNA(x$as_population)){
   knitr::opts_chunk$set(eval = FALSE)
   no_pop_data <- TRUE
+  
 } else{
   cat("There is no population data therefore alert rates can not be calculated.")
 }
 
+```
+
+
+<!-- ======================================================= -->
+## Overall
+
+### Weekly, Since Database Start 
+
+```{r alert_rates}
+
+x_alert_rate_sous_co <- x %>%
+  count(epiweek_report_label, status, total_population) %>%
+  mutate(alert_rate = 10000 * n / total_population) 
+
+ggplot(data = x_alert_rate_sous_co, 
+       aes(x = epiweek_report_label, y = alert_rate, fill = status)) +
+  geom_col() + 
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par semaine \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes pour \n", 
+                      "le sous-coordination de Goma")) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom") +
+  scale_months
+
+```
+
+
+### Table - Weekly Since Database Start
+
+```{r table_alert_rates_per_week, fig.keep = "all"}
+
+table_alert_rates_per_week <- x_alert_rate_sous_co %>%
+  select(-alert_rate) %>% 
+  spread(status, n, fill = 0) %>% 
+  mutate(total = statut_inconnu + invalidee + validee,
+         alert_rate = 10000 * total / total_population,
+         alert_rate = round(alert_rate, 4))
+
+table_alert_rates_per_week %>%
+  show_table()
+
+```
+
+
+<!-- ======================================================= -->
+## Overall Past 3 Weeks
+
+### Daily, Past 3 Weeks 
+
+``` {r alert_rates_recent}
+
+x_alert_rate_sous_co <- x_recent %>%
+  count(date, status, total_population) %>%
+  mutate(alert_rate = 10000 * n / total_population) 
+
+ggplot(data = x_alert_rate_sous_co, aes(x = date, 
+                                        y = alert_rate, fill = status)) +
+  geom_col() + 
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par jour \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes pour \n", 
+                      "le sous-coordination de Goma")) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom") +
+  scale_weeks
+
+```
+
+### Table - Weekly Since Database Start
+
+```{r table_alert_rates_recent, fig.keep = "all"}
+
+table_alert_rates_recent <- x_alert_rate_sous_co %>%
+  select(-alert_rate) %>% 
+  spread(status, n, fill = 0) %>% 
+  mutate(total = statut_inconnu + invalidee + validee,
+         alert_rate = 10000 * total / total_population,
+         alert_rate = round(alert_rate, 4))
+
+table_alert_rates_recent %>%
+ show_table()
+  
+```
+
+
+<!-- ======================================================= -->
+## Health Zone
+
+### Total, Since Database Start
+
+``` {r alert_rate_zone_de_sante_total_validation_status}
+
+date_span <- database_date - min(x$date, na.rm = TRUE)
+number_weeks <- as.numeric(date_span/7)
+
+x_alert_rate_zone_sante <- x %>%
+  group_by(status, zone_de_sante, zs_population) %>%
+  filter(top_zones != "other" & zs_population > 0) %>%
+  summarise(count = n()) %>%
+  mutate(alert_rate = 10000 * count / (zs_population * number_weeks))
+
+ggplot(data = x_alert_rate_zone_sante, aes(x = zone_de_sante, 
+                                           y = alert_rate, fill = status)) +
+  geom_col() +
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par semaine \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
+                      "de validation et zone de santé")) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom")
 
 
 ```
 
+### Weekly, Since Database Start
+
+``` {r alert_rate_zone_de_sante_weekly_status, fig.height = 5, fig.width = 10}
+
+x_alert_rate_zone_sante <- x %>%
+  group_by(epiweek_report_label, status, top_zones, zs_population) %>%
+  filter(top_zones != "other") %>%
+  summarise(count = n()) %>%
+  mutate(alert_rate = 10000 * count / zs_population)
+
+ggplot(data = x_alert_rate_zone_sante, aes(x = epiweek_report_label, 
+                                           y = alert_rate, fill = status)) +
+  geom_col() +
+  facet_wrap( ~ top_zones) +
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par semaine \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
+                      "de validation, et zone de santé")) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom") +
+  scale_x_date(date_breaks = "2 month", date_labels =  "%b") 
+ 
+```
+
+
+<!-- ======================================================= -->
+## Health Zone Past 3 Weeks
+
+### Total, Past 3 Weeks
+
+``` {r alert_rate_zone_de_sante_weekly_validation_status_recent}
+
+x_alert_rate_zone_sante <- x %>%
+  filter(date > database_date - 21) %>%
+  group_by(status, top_zones, zs_population) %>%
+  filter(as_population > 0) %>%
+  filter(top_zones != "other") %>%
+  summarise(count = n()) %>%
+  mutate(alert_rate = 10000 * count / (zs_population * 3))
+
+ggplot(data = x_alert_rate_zone_sante, aes(x = top_zones, 
+                                           y = alert_rate, fill = status)) +
+  geom_col() +
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par semaine \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
+                      "de validation et zone de santé depuis le 3 semaines", 
+                      " \ndernières")) +
+  large_txt +
+  theme(legend.position = "bottom") 
+
+
+```
+
+### Daily, Past 3 Weeks
+
+``` {r alert_rate_zone_de_sante_daily_status, fig.height = 5, fig.width = 12}
+
+x_alert_rate_zone_sante <- x %>%
+  filter(date > database_date - 21) %>%
+  group_by(date, status, top_zones, zs_population) %>%
+  filter(zs_population > 0) %>%
+  filter(top_zones != "other") %>%
+  summarise(count = n()) %>%
+  mutate(alert_rate = 10000 * count / zs_population)
+
+ggplot(data = x_alert_rate_zone_sante, aes(x = date, 
+                                           y = alert_rate, fill = status)) +
+  geom_col() +
+  facet_wrap( ~ top_zones) +
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par jour \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
+                      "de validation et zone de santé")) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom") +
+  scale_weeks
+
+```
+
+
+<!-- ======================================================= -->
+## Health Area
+
+### Total, Since Database Start
+
+``` {r alert_rate_aire_de_sante_weekly_val_total, fig.width = 14}
+
+date_span <- database_date - min(x$date)
+number_weeks <- as.numeric(date_span/7)
+
+x_alert_rate_zone_sante <- x %>%
+  group_by(status, top_zones, aire_de_sante, as_population) %>%
+  filter(top_zones != "other") %>%
+  filter(as_population > 0) %>%
+  summarise(count = n()) %>%
+  mutate(alert_rate = 10000 * count / (as_population * number_weeks))
+
+ggplot(data = x_alert_rate_zone_sante, aes(x = aire_de_sante, 
+                                           y = alert_rate, fill = status)) +
+  geom_col() +
+  scale_validations + 
+  facet_grid(. ~ top_zones, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes par semaine \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes par statut ", 
+                      "de validation et aire de santé")) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom") 
+
+
+```
+
+### Weekly, Since Database Start
+
+``` {r alert_rate_aire_de_sante_over_time, fig.width = 12, fig.height = 8}
+
+x_alert_rate_aire_sante <- x %>%
+  group_by(epiweek_report_label, status, top_aires, as_population) %>%
+  filter(top_aires != "other") %>%
+  filter(as_population > 0) %>%
+  summarise(count = n()) %>%
+  mutate(alert_rate = 10000 * count / as_population) 
+
+ggplot(data = x_alert_rate_aire_sante, aes(x = epiweek_report_label, 
+                                           y = alert_rate, fill = status)) +
+  geom_col() +
+  facet_wrap( ~ top_aires) +
+  scale_validations +
+  labs(x = "",
+       y = "Nombre d'alertes par semaine et \npar 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes par statut", 
+                      " de validation et aire de santé")) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom") +
+  scale_x_date(date_breaks = "2 month", date_labels =  "%b") 
+
+```
+
+<!-- ======================================================= -->
+## Health Area - Past 3 Weeks 
+
+``` {r alert_rate_as_3_weeks, fig.width = 14}
+
+x_alert_rate_aire_sante_recent <- x %>%
+  filter(top_zones != "other") %>%
+  filter(date > database_date - 21) %>%
+  filter(as_population > 0) %>%
+  group_by(status, aire_de_sante, top_zones, as_population) %>%
+  summarise(count = n()) %>%
+  mutate(alert_rate = (10000 * count) / (as_population * 3)) 
+
+ggplot(data = x_alert_rate_aire_sante_recent, aes(x = aire_de_sante, 
+                                                  y = alert_rate, fill = status)) +
+  geom_col() +
+  scale_validations +
+  facet_grid(. ~ top_zones, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes par 10000 \npersonnes et par semaine",
+       title = paste0("Nombre d'alertes par 10000 personnes et par semaine", 
+                      "\npour les 3 semaines dernières")) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom") 
+
+```
+
+
+### Daily, Past 3 Weeks
+
+``` {r alert_rate_aire_de_sante_recent, fig.width = 12, fig.height = 8}
+
+x_alert_rate_aire_sante <- x %>%
+  filter(date > database_date - 21) %>%
+  filter(top_aires != "other") %>%
+  filter(as_population > 0) %>%
+  group_by(date, status, top_aires, as_population) %>%
+  summarise(count = n()) %>%
+  mutate(alert_rate = 10000 * count / (as_population)) 
+
+ggplot(data = x_alert_rate_aire_sante, aes(x = date, 
+                                           y = alert_rate, fill = status)) +
+  geom_col() +
+  facet_wrap( ~ top_aires) +
+  scale_validations +
+  labs(x = "",
+       y = "Nombre d'alertes par jour et \npar 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes par statut", 
+                      " de validation et aire de santé")) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom") +
+  scale_x_date(date_breaks = "1 week", date_labels =  "%d %b") 
+
+```
 
 
 <!-- ======================================================= -->
@@ -1973,6 +2298,10 @@ We copy these files to the `data/clean` folder:
 ```{r copy_rds, eval = TRUE}
 # copy some files into `data/clean/`
 
+if (!dir.exists("data/clean")) {
+  dir.create("data/clean")
+}
+
 # Provide the destination of where to copy the data
 destination <- here("data",
                     "clean",
@@ -1994,21 +2323,12 @@ stored inside the folder `produced_xlsx`:
 
 ### Cleaned alerts database
 
-``` {r exports_cleaned_alerts}
+```{r exports_tables, eval = TRUE}
 
-if (!dir.exists("produced_xlsx")) {
-  dir.create("produced_xlsx")
-}
+cleaned_alerts_database_goma <- x
 
-## Cleaned Alerts Database
-rio::export(x, 
-            file.path("produced_xlsx", "cleaned_alerts_database_goma.xlsx"))
-
-```
-
-``` {r exports_tables}
-
-to_export <- c("table_validation_overall_time",
+to_export <- c("cleaned_alerts_database_goma",
+               "table_validation_overall_time",
                "table_validation_overall_past_3_weeks",
                "table_hz_total_validation",
                "table_hz_over_time_validation",
