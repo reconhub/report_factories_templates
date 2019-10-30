@@ -1,0 +1,376 @@
+---
+title: "Epicurves"
+author: "Thibaut Jombart and Sara Hollis"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: pygments
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+    toc_collapse: no
+    toc_depth: 2
+    toc_float: yes
+    css: !expr here::here('css', 'style.css')
+---
+
+
+
+<br>
+
+<div class="report_meta">
+  <span class="notice">**Notice**: this is a **stable, routine report**. 
+  **Do not touch it unless it is broken.** To make a contribution, **carefully read 
+  the [README](../../../../../README.html) file**.</span>
+  
+  **Maintainer:** Thibaut Jombart (thibautjombart@gmail.com)
+  
+  **Code contributors:** Sara Hollis, Thibaut Jombart, Amy Gimma
+  
+  **Data contributors:** Yannick Tutu, Richy Ngombo
+  
+  **Version:** 1.0.0
+  
+  **Reviewed by:** 
+</div>
+
+
+
+
+
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This report produces basic epicurves by dates of onset or reporting, with
+various stratification, from the cleaned Master linelist database.
+
+### Data used
+
+This report uses the latest cleaned Master linelist data.
+
+### Method
+
+The data preparation involves the following steps, detailed in the following
+tabs:
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc.
+
+* **Add new variables**: addition of new variables to the Master linelist database, like top
+  affected health zones.
+
+* **Filter the data**: keep only relevant confirmed and probable cases, possibly
+  removing erroneous dates, for further analysis
+
+
+
+<!-- ====================================================== -->
+## Load scripts
+
+These scripts will load:
+
+* all local scripts, stored as `.R` filesinside `/scripts/`
+* all global scripts, i.e. stored outside the factory in `../scripts/`
+* the path to the cleaned MDC data stored as `x`
+
+**Important**: we need to make sure the soucing of `R` scripts is done using the
+current environment, using the argument `local = TRUE`. This is in particular
+essential when `params` is used, as some functions and settings are dependent
+upon it.
+
+```{r read_scripts}
+
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$", full.names=TRUE)
+for (file in scripts_files) source(file, local = TRUE)
+
+ggthemr("grape")
+
+## show parameters
+params
+
+```
+
+
+
+
+<!-- ====================================================== -->
+## Load data
+
+We extract the completion date from the file names, for:
+
+1. cases data
+
+2. contacts data
+
+3. relationships between cases data
+
+4. relationships between contacts data
+
+
+```{r load_data}
+
+## step 1
+cases_file
+cases <- custom_import(cases_file) %>%
+  as_tibble()
+
+
+## step 2
+contacts_file
+contacts <- custom_import(contacts_file) %>%
+  as_tibble()
+
+
+## step 3
+cases_relationships_file
+cases_relationships <- custom_import(cases_relationships_file) %>%
+  as_tibble()
+
+
+## step 4
+contacts_relationships_file
+contacts_relationships <- custom_import(contacts_relationships_file) %>%
+  as_tibble()
+
+```
+
+
+<!-- ====================================================== -->
+## Completion date
+
+We extract the completion date from the name of the cases file.
+
+```{r database_date}
+
+## extract date of database based on cases file
+cases_file_short <- gsub("^[^.]+/", "", cases_file)
+database_date <- cases_file_short %>%
+  guess_dates()
+database_date
+
+```
+
+The **completion date** of the database is **`r format(database_date, format =
+"%A %d %b %Y")`**.
+
+
+
+
+
+<!-- ====================================================== -->
+## Data standardisation
+
+Here we standardise data using `clean_data`, which set all data to lower case,
+removes special characters, replaces non-ascii characters with their closest
+ascii match.
+
+```{r clean_data}
+
+## standardise all data
+cases <- clean_data(cases, guess_dates = FALSE)
+contacts <- clean_data(contacts, guess_dates = FALSE)
+cases_relationships <- clean_data(cases_relationships, guess_dates = FALSE)
+contacts_relationships <- clean_data(contacts_relationships, guess_dates = FALSE)
+
+```
+  
+
+
+
+<!-- ====================================================== -->
+## Dates processing
+
+Here we ensure that dates we will be using are indeed dates, and convert them
+where necessary using `guess_dates`.
+
+```{r clean_dates}
+
+cases <- cases %>%
+  mutate(date_of_reporting = guess_dates(date_of_reporting),
+         date_of_onset = guess_dates(date_of_onset),
+         date_of_outcome = guess_dates(date_of_outcome))
+
+```
+
+
+
+
+
+<!-- ====================================================== -->
+## Adding new variables
+
+In the following we add variables to the datasets:
+
+* `cases`
+    + `top_zones`: the 5 health zones having reported most cases over the last
+      42 days
+    * `epiweek_report_label`: the epiweek for the date of reporting
+    * `epiweek_report` the first day of the epiweek for the date of reporting
+
+```{r new_variables}
+
+recent_date <- database_date - 42
+recent_cases <- cases$date_of_reporting >= recent_date
+ 
+cases <- cases %>%
+  mutate(top_zones = top_values(location_1, 5, subset = recent_cases),
+         epiweek_report_label = aweek::date2week(date_of_reporting,
+                                                 week_start = "Monday", 
+                                                 floor_day = TRUE),
+         epiweek_report = aweek::week2date(epiweek_report_label,
+                                           week_start = "Monday"))
+
+```
+
+
+
+
+
+
+
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+# Export data {.tabset .tabset-fade .tabset-pills}
+
+<!-- ===================================================== -->
+## Outline
+In this part we export the clean datasets to `rds` files, and create a
+`current_clean_data.R` script in `/scripts/` which will create object pointing
+to the right files.
+
+
+
+
+<!-- ===================================================== -->
+## R objects
+
+We export some of the clean database, placed in `produced_rds/` as well as in
+`data/clean/`:
+
+```{r export_rds}
+
+## check if a directory exists and if not then creates it
+if (!dir.exists("produced_rds")) {
+  dir.create("produced_rds")
+}
+
+## create the text for the file name with the database date
+cases_rds_file_name <- sprintf("%sclean_%s.rds",
+                         undated_file_name(cases_file),
+                         format(database_date, "%Y-%m-%d"))
+cases_rds_file_name
+
+## save the rds file in the produced_rds folder
+rio::export(cases,
+            file.path("produced_rds", cases_rds_file_name))
+
+```
+
+We copy these files to the `data/clean` folder:
+
+```{r copy_rds}
+# copy some files into `data/clean/`
+
+# Provide the destination of where to copy the data
+destination <- here("data",
+                    "clean",
+                    cases_rds_file_name)
+# Copy the rds data
+file.copy(from = file.path("produced_rds", cases_rds_file_name),
+          to = destination,
+          overwrite = TRUE)
+
+```
+
+
+
+<!-- ===================================================== -->
+## Update the `current_clean_data.R` script
+
+```{r update_script}
+
+## path to the output file 
+script_destination <- here::here("scripts",
+                                 "current_clean_data.R")
+
+## comments to say when this was updated
+txt <- paste("## This file is generated automatically by `aaa_clean_linelist`",
+             "## Do not edit it by hand!\n",
+             sep = "\n")
+cat(txt, file = script_destination, append = FALSE)
+
+txt <- sprintf("\n## This file was last updated on the: %s\n",
+               Sys.time())
+cat(txt, file = script_destination, append = TRUE)
+
+## actual content of the script
+txt <- sprintf('\ncurrent_clean_cases <- here::here("data",
+                                  "clean",
+                                  "%s")',
+               cases_rds_file_name)
+cat(txt, file = script_destination, append = TRUE)
+
+```
+
+
+
+
+
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+# System information {.tabset .tabset-fade .tabset-pills}
+
+The following information documents the system on which the document was
+compiled.
+
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+R.version
+```
+
+
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+sessionInfo()
+```
+
+
+### Change log:
+
+#### Version 1.0.0
+
+* first version
+* reads in: *cases*, *contacts*, *cases_relationships*, *contacts_relationships*
+* standardise data (lower case, no accents, clean separators etc.)
+* convert dates used in other reports
+* adds variables (epiweek, top zones)
+* export stuff and create `current_clean_data.R` script
