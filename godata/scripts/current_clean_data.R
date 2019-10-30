@@ -1,8 +1,11 @@
 ## This file is generated automatically by `aaa_clean_linelist`
 ## Do not edit it by hand!
 
-## This file was last updated on the: 2019-10-17 13:40:10
+## This file was last updated on the: 2019-10-30 14:26:11
 
-current_clean_data <- here::here("data",
-                                 "clean",
-                                 "master_linelist_clean_2019-10-19.rds")
+current_clean_cases <- here::here("data",
+                                  "clean",
+                                  "cases_clean_2019-10-30.rds")
+current_clean_relationships <- here::here("data",
+                                                "clean",
+                                                "relationships_clean_2019-10-30.rds")

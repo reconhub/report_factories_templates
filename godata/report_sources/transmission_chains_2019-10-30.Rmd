@@ -277,6 +277,9 @@ We build the *epicontacts* object using:
 
 * the *cases_relationships* database stored as `chains`
 
+We then retain only transmission chains for which the 2 cases are documented in
+the linelist (using `thin`).
+
 ```{r epicontacts}
 
 select_linelist <- linelist %>%
@@ -285,6 +288,7 @@ select_linelist <- linelist %>%
          "last_name",
          "gender",
          "age_years",
+         "age_class",
          "location_1",
          "classification",
          "outcome",
@@ -293,13 +297,23 @@ select_linelist <- linelist %>%
          "date_of_outcome",
          "date_of_infection")
 
-x <- make_epicontacts(linelist = select_linelist,
-                      contacts = chains,
-                      directed = TRUE,
-                      id = "id",
-                      from = "source_uid",
-                      to = "target_uid")
-x
+## make epicontacts, before thining
+x_all <- make_epicontacts(linelist = select_linelist,
+                          contacts = chains,
+                          directed = TRUE,
+                          id = "id",
+                          from = "source_uid",
+                          to = "target_uid")
+
+summary(x_all)
+
+## thinned epicontacts: retaining only chain with both cases documented in the
+## linelist
+x <- x_all %>%
+  thin(what = "contacts") %>%
+  thin(what = "linelist")
+
+summary(x)
 
 ```
 
@@ -344,8 +358,8 @@ In this section, we add the following delays to the `$contacts` slot:
 ```{r add_delays}
 
 x$contacts <- x$contacts %>%
-  mutate(serial_interval = get_pairwise(x, "date_onset"),
-         reporting_interval = get_pairwise(x, "date_report"))
+  mutate(serial_interval = get_pairwise(x, "date_of_onset"),
+         reporting_interval = get_pairwise(x, "date_of_reporting"))
 
 ```
 
@@ -395,14 +409,13 @@ The resulting chains are stored as a new object `x_active`.
 
 ```{r active_chains}
 
-
 ## set limit date
 date_recent <- linelist_date - 42
 
 ## find which clusters are active
 x$linelist <- x$linelist %>%
   group_by(cluster_id) %>%
-  mutate(active_cluster = any(date_report > date_recent, na.rm = TRUE))
+  mutate(active_cluster = any(date_of_reporting > date_recent, na.rm = TRUE))
 
 x_active <- x
 x_active$linelist <- x_active$linelist %>%
@@ -443,13 +456,13 @@ file [`plot_chains.html`](plot_chains.html).
 ```{r plot_chains}
 
 plot_x <- plot(x,
-               node_color = "zone_de_sante",
+               node_color = "location_1",
                node_shape = "gender",
                shapes = c(female = "female",
                           male = "male",
                           unknown = "question-circle"),
                legend_max = 100,
-               edge_color = "type_contamination"
+               edge_color = "context_of_exposure"
                )
 
 ```
@@ -460,29 +473,29 @@ plot_x <- plot(x,
 <!-- ============================================ -->
 ## Plot active chains
 
-Graphs will be shown using the date of isolation (`date_admission`) if no value
+Graphs will be shown using the date of reporting (`date_of_onset`) if no value
 is missing; otherwise the default plotting of transmissions will be used.
 
 
 ```{r plot_active_chains_2}
-## check if some date_admission are missing
-missing_date <- get_pairwise(x_active, "date_admission") %>% is.na()
+## check if some date_of_onset are missing
+missing_date <- get_pairwise(x_active, "date_of_onset") %>% is.na()
 
 if (!any(missing_date)) {
-  x_axis_info <- "date_admission"
+  x_axis_info <- "date_of_onset"
 } else {
   x_axis_info <- NULL
 }
 
 ## make the plot
 plot_x_active <- plot(x_active,
-                      node_color = "zone_de_sante",
+                      node_color = "location_1",
                       node_shape = "gender",
                       shapes = c(female = "female",
                                  male = "male",
                                  unknown = "question-circle"),
                       legend_max = 100,
-                      edge_color = "type_contamination",
+                      edge_color = "context_of_exposure",
                       x_axis = x_axis_info,
                       edge_width = 5
                       )
@@ -541,13 +554,13 @@ x_unresolved <- x %>%
 
 ## step 3
 plot_x_unresolved <- plot(x_unresolved,
-                          node_color = "zone_de_sante",
+                          node_color = "location_1",
                           node_shape = "gender",
                           shapes = c(female = "female",
                                      male = "male",
                                      unknown = "question-circle"),
                           legend_max = 100,
-                          edge_color = "type_contamination",
+                          edge_color = "context_of_exposure",
                           x_axis = x_axis_info,
                           edge_width = 5
                       )
@@ -591,7 +604,7 @@ x_weird_si <- x_weird_si %>%
 
 ## step 2
 plot_x_weird_si <- plot(x_weird_si,
-                        node_color = "zone_de_sante",
+                        node_color = "location_1",
                         node_shape = "gender",
                         shapes = c(female = "female",
                                    male = "male",
@@ -655,9 +668,9 @@ ggplot(pairs_sex,
                         breaks = c(1, 5, 10, 20, 30, 40)) +
   large_txt +
   rotate_x_text(45) + 
-  labs(title = "Transmissions between sex",
-       y = "Source case",
-       x = "Infectee")
+  labs(title = "Transmissions entre sexe",
+       y = "Cas source",
+       x = "Cas secondaire")
 
 ```
 
@@ -694,9 +707,9 @@ ggplot(pairs_age,
                         breaks = c(1, 5, 10, 20, 30, 40)) +
   large_txt +
   rotate_x_text(45) + 
-  labs(title = "Transmissions between Age Groups",
-       y = "Source case",
-       x = "Infectee")
+  labs(title = "Transmissions entre classe d'âge",
+       y = "Cas source",
+       x = "Cas secondaire")
 
 ```
 
@@ -717,15 +730,16 @@ circle_plot(pairs_age, label_space = 2)
 
 We plot transmissions by health zones:
 
-```{r contacts_zone_de_sante}
+```{r contacts_location_1}
 
-pairs_zone_de_sante <- get_pairwise(x,
-                                    "zone_de_sante",
+pairs_location_1 <- get_pairwise(x,
+                                    "location_1",
                                     function(from, to)
                                       as.data.frame(table(from, to)))
 
-ggplot(pairs_zone_de_sante,
+ggplot(pairs_location_1,
        aes(y = from, x = to, size = Freq)) +
+  theme_bw() +
   geom_point(color = "navy", alpha = .5) +
   scale_size_continuous("Number of \ntransmissions",
                         range = c(1, 20),
@@ -733,19 +747,19 @@ ggplot(pairs_zone_de_sante,
                         breaks = c(1, 5, 10, 20, 30, 40)) +
   large_txt +
   rotate_x_text(45) + 
-  labs(title = "Transmissions across health zones",
-       y = "Source case",
-       x = "Infectee")
+  labs(title = "Transmissions entre zones de santé",
+       y = "Cas source",
+       x = "Cas secondaire")
 
 ```
 
 We provide the alternative circular visualisation; colors of the flows are
 indicative of the source.
 
-```{r contacts_zone_de_sante_circi}
+```{r contacts_location_1_circi}
 
 ## Chord diagram
-circle_plot(pairs_zone_de_sante, label_space = 2)
+circle_plot(pairs_location_1, label_space = 2)
 
 ```
 
@@ -755,7 +769,7 @@ zones:
 ```{r move_zones}
 
 move_zone <- get_pairwise(x,
-                          "zone_de_sante",
+                          "location_1",
                           function(from, to)
                             as.logical(from != to))
 move_zone
@@ -775,141 +789,6 @@ Overall, `r p_move_health_zone`% (IC95%: `r ci_move_health_zone[1]`%-`r ci_move_
 
 
 
-
-
-<!-- ============================================ -->
-## By health areas
-
-We plot transmissions by health areas:
-
-```{r contacts_aire_de_sante, fig.width = 12}
-
-pairs_aire_de_sante <- get_pairwise(x,
-                                    "aire_de_sante",
-                                    function(from, to)
-                                      as.data.frame(table(from, to)))
-
-ggplot(pairs_aire_de_sante,
-       aes(y = from, x = to, size = Freq)) +
-  theme_bw() +
-  geom_point(color = "navy", alpha = .5) +
-  scale_size_continuous("Number of \ntransmissions",
-                        range = c(1, 10),
-                        limits = c(1, NA),
-                        breaks = c(1, 5, 10, 20, 30, 40)) +
-  large_txt +
-  smaller_axis_txt +
-  rotate_x_text(90) + 
-  labs(title = "Transmissions across health areas",
-       y = "Source case",
-       x = "Infectee")
-
-
-```
-
-
-We compute the proportion of transmission happening across different health
-areas:
-
-```{r move_areas}
-
-move_area <- get_pairwise(x,
-                          "aire_de_sante",
-                          function(from, to)
-                            as.logical(na.omit(from != to)))
-move_area
-
-## mean and 95% CI
-p_move_health_area <- round(100 * mean(move_area))
-p_move_health_area
-ci_move_health_area <- prop_ci(k = sum(move_area),
-                               n = length(move_area),
-                               perc = TRUE,
-                               dec = 0)
-ci_move_health_area
-
-```
-
-Overall, `r p_move_health_area`% (IC95%: `r ci_move_health_area[1]`%-`r ci_move_health_area[2]`%) of transmissions happen cross different health areas.
-
-
-
-
-
-<!-- ============================================ -->
-## Sources and recipients of transmissions
-
-In this section we characterise health areas in terms of the number of
-transmissions given ("*sources*"), or received ("*recipients*").
-
-```{r sources_recipients, fig.height = 8, fig.width = 12}
-
-## count cases sourced by area
-df_sources <- pairs_aire_de_sante %>%
-  filter(as.character(from) != as.character(to), Freq > 0) %>%
-  group_by(from) %>%
-  summarise(n_sourced = sum(Freq)) %>%
-  rename(aire_de_sante = from)
-
-## count cases received by area
-df_receivers <- pairs_aire_de_sante %>%
-  filter(as.character(from) != as.character(to), Freq > 0) %>%
-  group_by(to) %>%
-  summarise(n_received = sum(Freq)) %>%
-  rename(aire_de_sante = to)
-
-## put the information together
-table_sources_recipients <- full_join(df_sources, df_receivers) %>%
-  filter(aire_de_sante != "inconnu") %>% 
-  replace_na(list(n_sourced = 0, n_received = 0)) %>%
-  arrange(desc(n_sourced), desc(n_received))
-
-## add info on zones
-zone_info <- linelist %>%
-  group_by(aire_de_sante, zone_de_sante) %>%
-  count() %>%
-  group_by(aire_de_sante) %>%
-  top_n(1, n) %>%
-  ungroup() %>% 
-  select(1:2)
-
-table_sources_recipients <- right_join(zone_info, table_sources_recipients)
-
-table_sources_recipients_top <- table_sources_recipients %>%
-  mutate(sum = n_sourced + n_received) %>%
-  group_by(zone_de_sante) %>% 
-  top_n(5, sum) %>%
-  arrange(zone_de_sante, sum) %>%
-  mutate(rank = 1:n()) %>% 
-  top_n(4, rank)
-
-
-## make the plot
-ggplot(table_sources_recipients,
-       aes(x = n_received,
-           y = n_sourced,
-           color = aire_de_sante)) +
-  theme_bw() +
-  geom_point() +
-  geom_label_repel(data = table_sources_recipients_top,
-                   aes(label = aire_de_sante), size = 4) +
-  scale_x_continuous(breaks = int_breaks) +
-  scale_y_continuous(breaks = int_breaks) +
-  large_txt +
-  smaller_axis_txt +
-  theme(strip.text = element_text(size = 16)) +
-  facet_wrap(~ zone_de_sante) +
-  scale_color_discrete(guide = FALSE) +
-  labs(title = "Donneur et receveurs de cas",
-       x = "Nombre de cas reçus",
-       y = "Nombre de cas sourcés")
-
-## display the table
-table_sources_recipients %>%
-  show_table()
-
-
-```
 
 
 
@@ -965,7 +844,7 @@ under-estimating the $R$. We use a conservative limit of 45 days:
 ```{r R_plots}
 
 old_cases <- R_df %>%
-  filter(date_onset < (chains_date - 45))
+  filter(date_of_onset < (chains_date - 45))
 
 ## graph
 ggplot(old_cases, aes(x = R)) +
@@ -991,7 +870,7 @@ R_df %>%
 
 ```{r R_in_time}
 
-ggplot(R_df, aes(x = date_report, y = R)) +
+ggplot(R_df, aes(x = date_of_reporting, y = R)) +
   geom_point() +
   geom_smooth() +
   theme_bw() +
@@ -1037,7 +916,7 @@ We first derive the empirical distribution:
 
 ## extract empirical data
 serial_interval_empirical <- x %>%
-  get_pairwise("date_onset") %>%
+  get_pairwise("date_of_onset") %>%
   na.omit() %>%
   as.integer()
 
@@ -1109,7 +988,7 @@ We first derive the empirical distribution:
 
 ## extract empirical data
 reporting_interval_empirical <- x %>%
-  get_pairwise("date_report") %>%
+  get_pairwise("date_of_reporting") %>%
   na.omit() %>%
   as.integer()
 
@@ -1292,8 +1171,8 @@ if (!dir.exists("produced_xlsx")) {
 to_export <- c("table_duplicates",
                "table_unresolved",
                "table_weird_si",
-               "table_self_infections",
-               "table_sources_recipients")
+               "table_self_infections"
+               )
 
 
 
