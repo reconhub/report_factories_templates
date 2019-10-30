@@ -1286,6 +1286,20 @@ sessionInfo()
 
 
 
+
+
+
+<!-- ============================================ -->
+## Compilation parameters
+
+The following parameters (`params`) have been used during compilation:
+
+```{r params}
+params
+```
+
+
+
 <!-- ============================================ -->
 ## ChangeLog
 

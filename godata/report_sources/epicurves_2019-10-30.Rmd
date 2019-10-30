@@ -347,6 +347,9 @@ for (e in to_export) {
 The following information documents the system on which the document was
 compiled.
 
+
+
+<!-- ============================================ -->
 ## System 
 
 This provides information on the operating system.
@@ -355,6 +358,9 @@ This provides information on the operating system.
 Sys.info()
 ```
 
+
+
+<!-- ============================================ -->
 ## R environment
 
 This provides information on the version of R used:
@@ -364,6 +370,8 @@ R.version
 ```
 
 
+
+<!-- ============================================ -->
 ## R packages
 
 This provides information on the packages used:
@@ -373,23 +381,15 @@ sessionInfo()
 ```
 
 
-### Change log:
 
-#### Version 2.1.0
 
-* added new variable names
-* set color scale for zone de sante across document
-* fixed spelling mistakes
-* changed table and figure names as appropriate ("last 21 days" to "recent onset")
-* added figures and tables for top recent onset ZS, daily for the last 3 months
-* exported new table
+<!-- ============================================ -->
+## Compilation parameters
 
-### To do: 
-* check use of epiweek_onset_label (lolwa?)
-* rename variables (last_21_days)
-* describe 21 (or other timeframe) days more clearly in text
-* add table and fig for "top ZS recent report" data
-* decide on "recent" timeframe
-* decide on plot timeline in days for daily plots (63 days?)
-* review with Thibaut
-* decide maintainer
+The following parameters (`params`) have been used during compilation:
+
+```{r params}
+params
+```
+
+

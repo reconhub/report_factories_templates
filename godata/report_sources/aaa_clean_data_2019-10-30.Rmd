@@ -1,5 +1,5 @@
 ---
-title: "Epicurves"
+title: "GoData: let's go clean"
 author: "Thibaut Jombart and Sara Hollis"
 date: "`r format(Sys.time(), '%A %d %B %Y')`"
 output:
@@ -26,12 +26,10 @@ output:
   
   **Maintainer:** Thibaut Jombart (thibautjombart@gmail.com)
   
-  **Code contributors:** Sara Hollis, Thibaut Jombart
+  **Code contributors:** Thibaut Jombart, Sara Hollis
   
   **Data contributors:** GoData team Beni
-  
-  **Version:** 1.0.0
-  
+    
   **Reviewed by:** 
 </div>
 
@@ -382,6 +380,9 @@ cat(txt, file = script_destination, append = TRUE)
 The following information documents the system on which the document was
 compiled.
 
+
+
+<!-- ===================================================== -->
 ## System 
 
 This provides information on the operating system.
@@ -390,6 +391,9 @@ This provides information on the operating system.
 Sys.info()
 ```
 
+
+
+<!-- ===================================================== -->
 ## R environment
 
 This provides information on the version of R used:
@@ -399,6 +403,8 @@ R.version
 ```
 
 
+
+<!-- ===================================================== -->
 ## R packages
 
 This provides information on the packages used:
@@ -408,13 +414,14 @@ sessionInfo()
 ```
 
 
-### Change log:
 
-#### Version 1.0.0
+<!-- ============================================ -->
+## Compilation parameters
 
-* first version
-* reads in: *cases*, *contacts*, *relationships*
-* standardise data (lower case, no accents, clean separators etc.)
-* convert dates used in other reports
-* adds variables (epiweek, top zones)
-* export stuff and create `current_clean_data.R` script
+The following parameters (`params`) have been used during compilation:
+
+```{r params}
+params
+```
+
+
