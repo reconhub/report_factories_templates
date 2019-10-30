@@ -2,4 +2,9 @@
 raw_folder <- here::here("data", "raw")
 
 # Get the names of the most recent data files
-current_data <- get_latest_data("master_linelist", raw_folder)
+cases_file <- get_latest_data("cases", raw_folder)
+
+relationships_file <- get_latest_data("relationships", raw_folder)
+
+contacts_file <- get_latest_data("contacts", raw_folder)
+

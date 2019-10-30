@@ -10,29 +10,19 @@ required_packages <- c(
   "scales",
   "incidence",
   "epicontacts",
-  "epitrix",
   "distcrete",
   "earlyR",
+  "epitrix",
   "projections",
   "janitor",
-  ## "followup",
-  ## "epirisk",
   "magrittr",
   "kableExtra",
-  "sjPlot",
   "ggrepel",
   "ggplot2",
-  #"ade4",
-  #"adegenet",
-  #"adegraphics",
   "linelist", # devel, only on github
   "ggthemr", # devel, only on github
-  "broom",
   "tidyverse",
-  "arsenal",
-  "plotly",
-  "cowplot",
-  "kableExtra"
+  "plotly"
 )
 
 available_packages <- .packages(all.available = TRUE)
