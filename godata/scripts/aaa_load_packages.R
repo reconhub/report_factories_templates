@@ -12,6 +12,7 @@ required_packages <- c(
   "epicontacts",
   "distcrete",
   "earlyR",
+  "epitrix",
   "projections",
   "janitor",
   "magrittr",
