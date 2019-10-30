@@ -80,7 +80,7 @@ We combine two data sources:
 
 * the *cases* database, containing information about the cases
 
-* the *cases_relationships* database, describing transmission chains using unique
+* the *relationships* database, describing transmission chains using unique
   identifiers for source cases and secondary cases
   
 
@@ -144,8 +144,8 @@ linelist <- rio::import(current_clean_cases) %>%
 linelist
 
 ## load the chains
-current_clean_cases_relationships
-chains <- rio::import(current_clean_cases_relationships) %>%
+current_clean_relationships
+chains <- rio::import(current_clean_relationships) %>%
     as_tibble()
 chains
 
@@ -155,7 +155,7 @@ linelist_date <- linelist_file_name %>%
   guess_dates()
 linelist_date
 
-chains_file_name <- gsub("^[^.]+/", "", current_clean_cases_relationships)
+chains_file_name <- gsub("^[^.]+/", "", current_clean_relationships)
 chains_date <- chains_file_name %>%
   guess_dates()
 chains_date
@@ -275,7 +275,7 @@ We build the *epicontacts* object using:
 
 * the *cases* database stored as `linelist`
 
-* the *cases_relationships* database stored as `chains`
+* the *relationships* database stored as `chains`
 
 We then retain only transmission chains for which the 2 cases are documented in
 the linelist (using `thin`).
