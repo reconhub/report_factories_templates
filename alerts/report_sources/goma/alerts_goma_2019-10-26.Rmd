@@ -315,7 +315,7 @@ unknown_as <- x %>%
 
 most_recent_unknown_as <- max(unknown_as$date, na.rm = T)
 
-start_date <- database_date - 21
+start_date <- database_date - 20
 unknown_as_3weeks <- x %>% 
   filter(!aire_de_sante %in% as_names & date >= start_date)
 
@@ -558,7 +558,7 @@ current database date.
 
 ```{r subset_21_days}
 
-start_date <- database_date - 21
+start_date <- database_date - 20
 x_recent <- filter(x, date >= start_date)
 outcomes_recent <- filter(outcomes, date >= start_date)
 
@@ -947,7 +947,7 @@ Areas with less than 20 alerts removed from graph but kept in table.
 ``` {r health_area_total_recent, fig.width = 14}
 
 x_validations <- x %>%
-  filter(date > database_date - 21) %>%
+  filter(date > start_date) %>%
   count(status, zone_de_sante, aire_de_sante) %>%
   filter(n >= 20)
 
@@ -977,7 +977,7 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
 ```{r table_ha_total_recent_validation, fig.keep = "all"}
 
 table_ha_total_recent_validation <- x %>%
-  filter(date > database_date - 21) %>%
+  filter(date > start_date) %>%
   count(aire_de_sante, status) %>%
   spread(status, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
@@ -992,7 +992,7 @@ table_ha_total_recent_validation %>%
 ```{r health_area_time_recent, fig.width = 12, fig.height = 8}
 
 x_validations <- x %>%
-  filter(date > database_date - 21) %>%
+  filter(date > start_date) %>%
   filter(top_aires != "other") %>%
   count(date, status, top_aires)
 
@@ -1017,7 +1017,7 @@ ggplot(x_validations, aes(x = date, y = n, fill = status)) +
 ```{r table_ha_over_time_recent_validation , fig.width = 12, fig.height = 5}
 
 table_ha_over_time_recent_validation <- x %>%
-  filter(date > database_date - 21) %>%
+  filter(date > start_date) %>%
   count(date, top_aires, status) %>%
   spread(status, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
@@ -1349,7 +1349,7 @@ Areas with less than 20 alerts removed from graph but kept in table.
 ``` {r health_area_total_recent_origin, fig.width = 14}
 
 x_origins <- x %>%
-  filter(date > database_date - 21) %>%
+  filter(date > start_date) %>%
   count(origin, zone_de_sante, aire_de_sante) %>%
   filter(n >= 20)
 
@@ -1393,7 +1393,7 @@ table_ha_total_recent_origins %>%
 
 x_origins_recent <- x %>%
   filter(top_aires != "other") %>%
-  filter(date > database_date - 21) %>%
+  filter(date > start_date) %>%
   count(date, origin, top_aires) 
 
 ggplot(x_origins_recent, aes(x = date, y = n, fill = origin)) +
@@ -1417,7 +1417,7 @@ ggplot(x_origins_recent, aes(x = date, y = n, fill = origin)) +
 ```{r table_ha_over_time_recent_origins, fig.width = 12, fig.height = 5}
 
 table_ha_over_time_recent_origins <- x %>%
-  filter(date > database_date - 21) %>%
+  filter(date > start_date) %>%
   count(date, top_aires, origin) %>%
   spread(origin, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
@@ -1805,7 +1805,7 @@ Only area with atleast than 20 alerts are presented in the graph all areas are p
 ``` {r health_area_total_recent_decision, fig.width = 14}
 
 x_decisions <- outcomes %>%
-  filter(date > database_date - 21) %>%
+  filter(date > start_date) %>%
   count(decision_comparison, zone_de_sante, aire_de_sante) %>%
   filter(n >= 20) 
 
@@ -1850,7 +1850,7 @@ table_ha_total_recent_decisions %>%
 
 x_decisions_recent <- outcomes %>%
   filter(top_aires != "other") %>%
-  filter(date > database_date - 21)
+  filter(date > start_date)
 
 ggplot(x_decisions_recent, aes(x = date, fill = decision_comparison)) +
   geom_bar() +
@@ -1873,7 +1873,7 @@ ggplot(x_decisions_recent, aes(x = date, fill = decision_comparison)) +
 ```{r table_ha_over_time_recent_decisions}
 
 table_ha_over_time_recent_decisions <- outcomes %>%
-  filter(date > database_date - 21) %>%
+  filter(date > start_date) %>%
   count(date, top_aires, decision_comparison) %>%
   spread(decision_comparison, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
@@ -2022,10 +2022,9 @@ date_span <- database_date - min(x$date, na.rm = TRUE)
 number_weeks <- as.numeric(date_span/7)
 
 x_alert_rate_zone_sante <- x %>%
-  group_by(status, zone_de_sante, zs_population) %>%
   filter(top_zones != "other" & zs_population > 0) %>%
-  summarise(count = n()) %>%
-  mutate(alert_rate = 10000 * count / (zs_population * number_weeks))
+  count(status, zone_de_sante, zs_population) %>%
+  mutate(alert_rate = 10000 * n / (zs_population * number_weeks))
 
 ggplot(data = x_alert_rate_zone_sante, aes(x = zone_de_sante, 
                                            y = alert_rate, fill = status)) +
@@ -2047,10 +2046,9 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = zone_de_sante,
 ``` {r alert_rate_zone_de_sante_weekly_status, fig.height = 5, fig.width = 10}
 
 x_alert_rate_zone_sante <- x %>%
-  group_by(epiweek_report_label, status, top_zones, zs_population) %>%
-  filter(top_zones != "other") %>%
-  summarise(count = n()) %>%
-  mutate(alert_rate = 10000 * count / zs_population)
+  filter(top_zones != "other" & zs_population > 0) %>%
+  count(epiweek_report_label, status, top_zones, zs_population) %>%
+  mutate(alert_rate = 10000 * n / zs_population)
 
 ggplot(data = x_alert_rate_zone_sante, aes(x = epiweek_report_label, 
                                            y = alert_rate, fill = status)) +
@@ -2077,12 +2075,11 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = epiweek_report_label,
 ``` {r alert_rate_zone_de_sante_weekly_validation_status_recent}
 
 x_alert_rate_zone_sante <- x %>%
-  filter(date > database_date - 21) %>%
-  group_by(status, top_zones, zs_population) %>%
+  filter(date > start_date) %>%
   filter(as_population > 0) %>%
   filter(top_zones != "other") %>%
-  summarise(count = n()) %>%
-  mutate(alert_rate = 10000 * count / (zs_population * 3))
+  count(status, top_zones, zs_population) %>%
+  mutate(alert_rate = 10000 * n / (zs_population * 3))
 
 ggplot(data = x_alert_rate_zone_sante, aes(x = top_zones, 
                                            y = alert_rate, fill = status)) +
@@ -2104,12 +2101,11 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = top_zones,
 ``` {r alert_rate_zone_de_sante_daily_status, fig.height = 5, fig.width = 12}
 
 x_alert_rate_zone_sante <- x %>%
-  filter(date > database_date - 21) %>%
-  group_by(date, status, top_zones, zs_population) %>%
+  filter(date > start_date) %>%
   filter(zs_population > 0) %>%
   filter(top_zones != "other") %>%
-  summarise(count = n()) %>%
-  mutate(alert_rate = 10000 * count / zs_population)
+  count(date, status, top_zones, zs_population) %>%
+  mutate(alert_rate = 10000 * n / zs_population)
 
 ggplot(data = x_alert_rate_zone_sante, aes(x = date, 
                                            y = alert_rate, fill = status)) +
@@ -2139,11 +2135,10 @@ date_span <- database_date - min(x$date)
 number_weeks <- as.numeric(date_span/7)
 
 x_alert_rate_zone_sante <- x %>%
-  group_by(status, top_zones, aire_de_sante, as_population) %>%
   filter(top_zones != "other") %>%
   filter(as_population > 0) %>%
-  summarise(count = n()) %>%
-  mutate(alert_rate = 10000 * count / (as_population * number_weeks))
+  count(status, top_zones, aire_de_sante, as_population) %>%
+  mutate(alert_rate = 10000 * n / (as_population * number_weeks))
 
 ggplot(data = x_alert_rate_zone_sante, aes(x = aire_de_sante, 
                                            y = alert_rate, fill = status)) +
@@ -2168,11 +2163,10 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = aire_de_sante,
 ``` {r alert_rate_aire_de_sante_over_time, fig.width = 12, fig.height = 8}
 
 x_alert_rate_aire_sante <- x %>%
-  group_by(epiweek_report_label, status, top_aires, as_population) %>%
   filter(top_aires != "other") %>%
   filter(as_population > 0) %>%
-  summarise(count = n()) %>%
-  mutate(alert_rate = 10000 * count / as_population) 
+  count(epiweek_report_label, status, top_aires, as_population) %>%
+  mutate(alert_rate = 10000 * n / as_population) 
 
 ggplot(data = x_alert_rate_aire_sante, aes(x = epiweek_report_label, 
                                            y = alert_rate, fill = status)) +
@@ -2197,11 +2191,10 @@ ggplot(data = x_alert_rate_aire_sante, aes(x = epiweek_report_label,
 
 x_alert_rate_aire_sante_recent <- x %>%
   filter(top_zones != "other") %>%
-  filter(date > database_date - 21) %>%
+  filter(date > start_date) %>%
   filter(as_population > 0) %>%
-  group_by(status, aire_de_sante, top_zones, as_population) %>%
-  summarise(count = n()) %>%
-  mutate(alert_rate = (10000 * count) / (as_population * 3)) 
+  count(status, aire_de_sante, top_zones, as_population) %>%
+  mutate(alert_rate = (10000 * n) / (as_population * 3)) 
 
 ggplot(data = x_alert_rate_aire_sante_recent, aes(x = aire_de_sante, 
                                                   y = alert_rate, fill = status)) +
@@ -2226,12 +2219,11 @@ ggplot(data = x_alert_rate_aire_sante_recent, aes(x = aire_de_sante,
 ``` {r alert_rate_aire_de_sante_recent, fig.width = 12, fig.height = 8}
 
 x_alert_rate_aire_sante <- x %>%
-  filter(date > database_date - 21) %>%
+  filter(date > start_date) %>%
   filter(top_aires != "other") %>%
   filter(as_population > 0) %>%
-  group_by(date, status, top_aires, as_population) %>%
-  summarise(count = n()) %>%
-  mutate(alert_rate = 10000 * count / (as_population)) 
+  count(date, status, top_aires, as_population) %>%
+  mutate(alert_rate = 10000 * n / (as_population)) 
 
 ggplot(data = x_alert_rate_aire_sante, aes(x = date, 
                                            y = alert_rate, fill = status)) +
