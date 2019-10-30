@@ -163,9 +163,9 @@ where `xxx` is a character string uniquely present in the type of data to use.
 
 This factory performs analyses of data gathered using GoData2, including:
 
-* cases data
-* contact tracing data
-* relationships between cases / contacts
+* *cases* data
+* *contact tracing* data
+* *relationships* between cases / contacts
 
 The factory is designed for data gathered during the 2019 Ebola outbreak in
 Eastern DRC. Because of data confidentiality issues, we cannot share the data
@@ -188,7 +188,7 @@ This factory includes the following:
 
 Clone or [download](https://github.com/reconhub/report_factories_templates/archive/master.zip) the factory, make sure the **reportfactory** is installed, then:
 
-1. put the data for *cases*, *contacts* and *relationships in
+1. put the data for *cases*, *contacts* and *relationships*  in
    `data/raw/[cases/contacts/relationships]_[date].xlsx` where `[date]` has the
    `yyyy-mm-dd` format
    
