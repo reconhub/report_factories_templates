@@ -1,0 +1,395 @@
+---
+title: "Epicurves"
+author: "Thibaut Jombart and Sara Hollis"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: pygments
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+    toc_collapse: no
+    toc_depth: 2
+    toc_float: yes
+    css: !expr here::here('css', 'style.css')
+---
+
+
+
+<br>
+
+<div class="report_meta">
+  <span class="notice">**Notice**: this is a **stable, routine report**. 
+  **Do not touch it unless it is broken.** To make a contribution, **carefully read 
+  the [README](../../../../../README.html) file**.</span>
+  
+  **Maintainer:** Thibaut Jombart (thibautjombart@gmail.com)
+  
+  **Code contributors:** Sara Hollis, Thibaut Jombart, Amy Gimma
+  
+  **Data contributors:** Yannick Tutu, Richy Ngombo
+  
+  **Version:** 1.0.0
+  
+  **Reviewed by:** 
+</div>
+
+
+
+
+
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This report produces basic epicurves by dates of onset or reporting, with
+various stratification, from the cleaned Master linelist database.
+
+### Data used
+
+This report uses the latest cleaned Master linelist data.
+
+### Method
+
+The data preparation involves the following steps, detailed in the following
+tabs:
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc.
+
+* **Add new variables**: addition of new variables to the Master linelist database, like top
+  affected health zones.
+
+* **Filter the data**: keep only relevant confirmed and probable cases, possibly
+  removing erroneous dates, for further analysis
+
+
+
+<!-- ====================================================== -->
+## Load scripts
+
+These scripts will load:
+
+* all local scripts, stored as `.R` filesinside `/scripts/`
+* all global scripts, i.e. stored outside the factory in `../scripts/`
+* the path to the cleaned MDC data stored as `x`
+
+**Important**: we need to make sure the soucing of `R` scripts is done using the
+current environment, using the argument `local = TRUE`. This is in particular
+essential when `params` is used, as some functions and settings are dependent
+upon it.
+
+```{r read_scripts}
+
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$", full.names=TRUE)
+for (file in scripts_files) source(file, local = TRUE)
+
+ggthemr("grape")
+
+## show parameters
+params
+
+```
+
+
+
+
+<!-- ====================================================== -->
+## Load data
+
+We load the current clean cases, whose path is defined in `scripts/current_clean_data.R`
+
+```{r load_data}
+
+## step 1
+current_clean_cases
+x <- rio::import(current_clean_cases) %>%
+  as_tibble()
+
+
+```
+
+
+<!-- ====================================================== -->
+## Completion date
+
+We extract the completion date from the name of the cases file.
+
+```{r database_date}
+
+## extract date of database based on cases file
+cases_file_short <- gsub("^[^.]+/", "", current_clean_cases)
+database_date <- cases_file_short %>%
+  guess_dates()
+database_date
+
+```
+
+The **completion date** of the database is **`r format(database_date, format =
+"%A %d %b %Y")`**.
+
+
+  
+
+
+
+<!-- ====================================================== -->
+## Filter data
+
+In this section we subset the data so that:
+
+* `cases` contains only confirmed and probable cases
+
+```{r filter}
+
+cases <- x %>%
+  filter(classification %in% c("confirmed", "probable"))
+
+```
+
+
+
+
+
+<!-- ====================================================== -->
+## Customised color scales
+
+We define custom colors to be used in graphs.
+
+```{r colors}
+
+scale_classification <- scale_fill_manual(
+    "",
+    values = c(confirmed = "#C83D52",
+               probable = "#D78E99"),
+    labels = c(confirmed = "Confirmé",
+               probable = "Probable"))
+
+```
+
+
+
+
+
+
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+# Epidemic curves {.tabset .tabset-fade .tabset-pills}
+
+<!-- ===================================================== -->
+## Outline
+
+This section analyses the `cases` database. We derive overall epicurves and
+stratified by:
+
+* confirmed/probable (`classification` variable)
+
+* health zone (`location_1` variable)
+
+
+
+
+<!-- ===================================================== -->
+## Overall cases
+
+```{r epicurve_overall}
+
+i_report_classification <- incidence(cases$date_of_reporting, 7, groups = cases$classification)
+
+plot(i_report_classification, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  scale_classification +
+  large_txt +
+  theme(legend.title = element_blank(),
+        legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                     "\npar date de début de symptômes à la date de", " ", 
+                     format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas par semaine") +
+  scale_months
+
+```
+
+We provide the corresponding numbers in a table:
+
+
+```{r table_epicurve_overall}
+
+table_epicurve_overall <- i_report_classification %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_epicurve_overall %>%
+  show_table()
+
+```
+
+
+
+
+<!-- ===================================================== -->
+## Stratified by health zone
+
+```{r epicurve_health_zone}
+
+cases %>%
+  filter(top_zones != "other") %>% 
+  ggplot(aes(x = epiweek_report, fill = classification)) +
+  geom_bar(alpha = .7) +
+  theme_bw() +
+  scale_classification +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(top_zones ~ .) +
+  theme(legend.position = "bottom") +
+   labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+                      "\npar semaine de notification, à la date de", " ", 
+                      format(database_date, "%d/%m/%Y")),
+        y = "Nombre de nouveaux cas par semaine",
+        x = "") +
+  custom_vert_facet +
+  scale_months
+
+```
+
+We provide the corresponding numbers in a table:
+
+```{r table_epicurve_health_zone}
+
+table_epicurve_health_zone <- cases %>%
+  count(epiweek_report, top_zones, classification) %>%
+  spread(classification, n, fill = 0) %>%
+  adorn_totals(c("row", "col"))
+
+table_epicurve_health_zone %>%
+  show_table()
+
+```
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# Export tables {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+Provide an outline of exported files.
+
+
+## Excel files
+
+```{r xlsx_exports}
+
+if (!dir.exists("produced_xlsx")) {
+  dir.create("produced_xlsx")
+}
+
+to_export <- c("table_epicurve_overall",
+               "table_epicurve_health_zone")
+
+for (e in to_export) {
+  rio::export(get(e),
+              file.path("produced_xlsx",
+                        paste0(e, ".xlsx")))
+}
+
+```
+
+Click on the following links to open the files (only works if the files above
+have been generated and are in the same folder as this document):
+
+
+```{r links, results = "asis"}
+
+for (e in to_export) {
+  txt <- sprintf("- [%s.xlsx](%s.xlsx)",
+                 e,
+                 file.path("produced_xlsx",
+                           e))
+  cat(txt, sep = "\n")
+}
+
+```
+
+
+
+
+
+
+
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+# System information {.tabset .tabset-fade .tabset-pills}
+
+The following information documents the system on which the document was
+compiled.
+
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+R.version
+```
+
+
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+sessionInfo()
+```
+
+
+### Change log:
+
+#### Version 2.1.0
+
+* added new variable names
+* set color scale for zone de sante across document
+* fixed spelling mistakes
+* changed table and figure names as appropriate ("last 21 days" to "recent onset")
+* added figures and tables for top recent onset ZS, daily for the last 3 months
+* exported new table
+
+### To do: 
+* check use of epiweek_onset_label (lolwa?)
+* rename variables (last_21_days)
+* describe 21 (or other timeframe) days more clearly in text
+* add table and fig for "top ZS recent report" data
+* decide on "recent" timeframe
+* decide on plot timeline in days for daily plots (63 days?)
+* review with Thibaut
+* decide maintainer
