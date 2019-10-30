@@ -211,6 +211,7 @@ In the following we add variables to the datasets:
       42 days
     * `epiweek_report_label`: the epiweek for the date of reporting
     * `epiweek_report` the first day of the epiweek for the date of reporting
+    * `age_class`
 
 ```{r new_variables}
 
@@ -223,11 +224,38 @@ cases <- cases %>%
                                                  week_start = "Monday", 
                                                  floor_day = TRUE),
          epiweek_report = aweek::week2date(epiweek_report_label,
-                                           week_start = "Monday"))
+                                           week_start = "Monday")) %>%
+  mutate(
+      age = as.numeric(age_years),
+      age_class = factor(
+          case_when(
+              age <= 5 ~ "<=5",
+              age <= 10 ~ "6-10",
+              age <= 17 ~ "11-17",
+              age <= 25 ~ "18-25",
+              age <= 35 ~ "26-35",
+              age <= 45 ~ "36-45",
+              age <= 55 ~ "46-55",
+              age <= 65 ~ "56-65",
+              is.finite(age) ~ "66+",
+              TRUE ~ "unknown"
+          ), levels = c(
+                 "<=5",
+                 "6-10",
+                 "11-17",
+                 "18-25",
+                 "26-35",
+                 "36-45",
+                 "46-55",
+                 "56-65",
+                 "66+",
+                 "unknown"
+             )),
+      age_class_plot = factor(
+          age_class,
+          levels = rev(levels(age_class))))
 
 ```
-
-
 
 
 
