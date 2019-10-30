@@ -38,7 +38,7 @@ knitr::opts_chunk$set(echo = TRUE,
   
   **Code contributors:** Arthur Fitzmaurice, Christopher Jarvis, Thibaut Jombart, Amy Gimma
   
-  **Data contributors:** Yannick Tutu, Richie Ngombo
+  **Data contributors:** Yannick Tutu, Richy Ngombo
   
   **Version:** 2.1.0
   
