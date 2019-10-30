@@ -545,7 +545,7 @@ weak points. This will involve the following steps:
 git fetch
 
 ## create a local branch matching that of the PR, and move to it
-git checkout xxx
+git checkout -b xxx
    
 ```
 
