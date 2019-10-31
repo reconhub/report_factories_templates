@@ -22,7 +22,8 @@ required_packages <- c(
   "linelist", # devel, only on github
   "ggthemr", # devel, only on github
   "tidyverse",
-  "plotly"
+  "plotly",
+  "zoo" # rolling operations
 )
 
 available_packages <- .packages(all.available = TRUE)
