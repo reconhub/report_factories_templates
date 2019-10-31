@@ -1,0 +1,403 @@
+---
+title: "Contact followup"
+author: "Thibaut Jombart and Sara Hollis"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: pygments
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+    toc_collapse: no
+    toc_depth: 2
+    toc_float: yes
+    css: !expr here::here('css', 'style.css')
+---
+
+
+
+<br>
+
+<div class="report_meta">
+  <span class="notice">**Notice**: this is a **stable, routine report**. 
+  **Do not touch it unless it is broken.** To make a contribution, **carefully read 
+  the [README](../../../../../README.html) file**.</span>
+  
+  **Maintainer:** Thibaut Jombart (thibautjombart@gmail.com)
+  
+  **Code contributors:** Sara Hollis, Thibaut Jombart, Amy Gimma
+  
+  **Data contributors:** Yannick Tutu, Richy Ngombo
+  
+  **Version:** 1.0.0
+  
+  **Reviewed by:** 
+</div>
+
+
+
+
+
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This report produces basic epicurves by dates of onset or reporting, with
+various stratification, from the cleaned Master linelist database.
+
+### Data used
+
+This report uses the latest cleaned Master linelist data.
+
+### Method
+
+The data preparation involves the following steps, detailed in the following
+tabs:
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc.
+
+* **Add new variables**: addition of new variables to the Master linelist database, like top
+  affected health zones.
+
+* **Filter the data**: keep only relevant confirmed and probable cases, possibly
+  removing erroneous dates, for further analysis
+
+
+
+<!-- ====================================================== -->
+## Load scripts
+
+These scripts will load:
+
+* all local scripts, stored as `.R` filesinside `/scripts/`
+* all global scripts, i.e. stored outside the factory in `../scripts/`
+* the path to the cleaned MDC data stored as `x`
+
+**Important**: we need to make sure the soucing of `R` scripts is done using the
+current environment, using the argument `local = TRUE`. This is in particular
+essential when `params` is used, as some functions and settings are dependent
+upon it.
+
+```{r read_scripts}
+
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$", full.names=TRUE)
+for (file in scripts_files) source(file, local = TRUE)
+
+ggthemr("grape")
+
+## show parameters
+params
+
+```
+
+
+
+
+<!-- ====================================================== -->
+## Load data
+
+We load the current *contacts* and *followup* data, whose path is defined in
+`scripts/current_clean_data.R`
+
+```{r load_data}
+
+current_clean_contacts
+contacts <- rio::import(current_clean_contacts) %>%
+  as_tibble()
+
+current_clean_followups
+followups <- rio::import(current_clean_followups) %>%
+  as_tibble()
+
+
+```
+
+
+
+<!-- ====================================================== -->
+## Completion date
+
+We extract the completion date from the name of the cases file.
+
+```{r database_date}
+
+## extract date of database based on cases file
+file_short <- gsub("^[^.]+/", "", current_clean_contacts)
+database_date <- file_short %>%
+  guess_dates()
+database_date
+
+```
+
+The **completion date** of the database is **`r format(database_date, format =
+"%A %d %b %Y")`**.
+
+
+
+
+<!-- ====================================================== -->
+## Quality controls
+
+We perform the following checks on the data:
+
+* check that contacts in `followups` are also documented in `contacts`; those
+  who are not are output to a table
+  
+```{r quality_controls}
+
+table_missing_contacts <- followups %>%
+  filter(!(lng_follow_up_field_label_contact_id %in% contacts$id))
+
+table_missing_contacts %>%
+  show_table()
+
+```
+
+
+
+  
+<!-- ====================================================== -->
+## Filtering
+
+We subset the rows of `followups` so that:
+
+1. `status` is either: *not_performed*, *not_seen*, *seen_no_signs*,
+*seen_with_signs*
+
+2. contacts are identified in the `contacts` database 
+
+
+```{r filter}
+
+## step 1 and 2
+status_to_keep <- c("not_performed",
+                    "not_seen",
+                    "seen_no_signs",
+                    "seen_with_signs")
+followups <- followups %>%
+  filter(status %in% status_to_keep,
+         lng_follow_up_field_label_contact_id %in% contacts$id)
+
+```
+
+
+
+
+<!-- ====================================================== -->
+## Join *followups* and *contacts*
+
+We add to the `followups` data some information drawn from the `contacts` data,
+including:
+
+* the date at which followup should start (`date_of_followup_start`)
+* the date at which followup should end (`date_of_followup_end`)
+
+```{r join}
+
+info_for_merging <- contacts %>%
+  select(id, date_of_followup_start) %>%
+  mutate(date_of_followup_end = date_of_followup_start + 20)
+
+followups <- followups %>%
+  right_join(info_for_merging,
+             by = c("lng_follow_up_field_label_contact_id" = "id"))
+
+
+```
+
+
+
+
+
+
+<!-- ====================================================== -->
+## Customised color scales
+
+We define custom colors to be used in graphs.
+
+```{r colors}
+
+scale_status <- scale_fill_manual(
+    "",
+    values = c(not_performed = "#938083",
+               not_seen = "#C23F54",
+               seen_no_signs = "#539998",
+               seen_with_signs = "#7E000B"),
+    labels = c(not_performed = "Non visité",
+               not_seen = "Non vu",
+               seen_no_signs = "Vu, pas de symptômes",
+               seen_with_signs = "Vu, symptômes"))
+
+```
+
+
+
+
+
+
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+# Follow-up completion {.tabset .tabset-fade .tabset-pills}
+
+<!-- ===================================================== -->
+## Outline
+
+* numbers of contacts by followup status over time
+
+* timeliness of contact listing
+
+
+## Contact followup over time
+
+```{r followup_time}
+
+ggplot(followups, aes(x = date_of_followup, fill = status)) +
+  geom_bar() +
+  theme_bw() +
+  large_txt +
+  scale_status +
+  scale_weeks +
+  rotate_x_text(45) +
+  labs(title = "Suivi des contacts par jour",
+       x = "",
+       y = "Nombre de contacts suivis") +
+  theme(legend.position = "bottom")
+
+table_followup_time <- followups %>%
+  count(date_of_followup, status) %>%
+  spread(status, n, fill = 0) %>%
+  adorn_totals(c("row", "col"))
+
+table_followup_time %>%
+  show_table()
+
+```
+
+
+
+## Contact classification over time
+
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# Export tables {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+Provide an outline of exported files.
+
+
+## Excel files
+
+```{r xlsx_exports, eval = FALSE}
+
+if (!dir.exists("produced_xlsx")) {
+  dir.create("produced_xlsx")
+}
+
+to_export <- c("table_",
+               "table_")
+
+for (e in to_export) {
+  rio::export(get(e),
+              file.path("produced_xlsx",
+                        paste0(e, ".xlsx")))
+}
+
+```
+
+Click on the following links to open the files (only works if the files above
+have been generated and are in the same folder as this document):
+
+
+```{r links, results = "asis"}
+
+for (e in to_export) {
+  txt <- sprintf("- [%s.xlsx](%s.xlsx)",
+                 e,
+                 file.path("produced_xlsx",
+                           e))
+  cat(txt, sep = "\n")
+}
+
+```
+
+
+
+
+
+
+
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+# System information {.tabset .tabset-fade .tabset-pills}
+
+The following information documents the system on which the document was
+compiled.
+
+
+
+<!-- ============================================ -->
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+
+
+<!-- ============================================ -->
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+R.version
+```
+
+
+
+<!-- ============================================ -->
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+sessionInfo()
+```
+
+
+
+
+<!-- ============================================ -->
+## Compilation parameters
+
+The following parameters (`params`) have been used during compilation:
+
+```{r params}
+params
+```
+
+
