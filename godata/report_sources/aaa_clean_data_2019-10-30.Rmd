@@ -45,12 +45,11 @@ output:
 
 ## Outline
 
-This report produces basic epicurves by dates of onset or reporting, with
-various stratification, from the cleaned Master linelist database.
+This is the universal cleaning script for raw data exported from godata.
 
 ### Data used
 
-This report uses the latest cleaned Master linelist data.
+This report uses the latest exported .xlsx from godata.
 
 ### Method
 
@@ -115,6 +114,8 @@ We extract the completion date from the file names, for:
 
 3. relationships between cases and contacts
 
+4. contact follow up data
+
 
 ```{r load_data}
 
@@ -133,6 +134,11 @@ contacts <- custom_import(contacts_file) %>%
 ## step 3
 relationships_file
 relationships <- custom_import(relationships_file) %>%
+  as_tibble()
+
+## step 4
+followups_file
+followups <- custom_import(followups_file) %>%
   as_tibble()
 
 ```
@@ -173,6 +179,7 @@ ascii match.
 cases <- clean_data(cases, guess_dates = FALSE)
 contacts <- clean_data(contacts, guess_dates = FALSE)
 relationships <- clean_data(relationships, guess_dates = FALSE)
+followups <- clean_data(followups, guess_dates = FALSE)
 
 ```
   
@@ -191,13 +198,51 @@ cases <- cases %>%
   mutate(date_of_reporting = guess_dates(date_of_reporting),
          date_of_onset = guess_dates(date_of_onset),
          date_of_outcome = guess_dates(date_of_outcome),
-         date_of_infection = guess_dates(date_of_infection))
+         date_of_infection = guess_dates(date_of_infection),
+         date_of_becoming_case = guess_dates(date_of_becoming_case),
+         date_of_burial = guess_dates(date_of_burial),
+         date_of_case_notification = guess_dates(date_de_notification_du_cas))
+
+contacts <- contacts %>%
+  mutate(date_of_reporting = guess_dates(date_of_reporting),
+         date_of_data_entry = guess_dates(created_at),
+         date_of_becoming_case = guess_dates(date_of_becoming_case),
+         date_of_onset = guess_dates(date_of_onset),
+         date_of_followup_start = guess_dates(start_of_the_followup),
+         date_of_followup_end = guess_dates(end_of_the_followup),
+         date_of_last_contact = guess_dates(date_of_last_contact))
+
+relationships <- relationships %>%
+  mutate(date_of_data_entry = guess_dates(created_at),
+         date_of_last_contact = guess_dates(date_of_last_contact))
+
+followups <- followups %>%
+  mutate(date_of_data_entry = guess_dates(created_at),
+         date_of_followup = guess_dates(date),
+         date_of_onset = guess_dates(dateapparitionsignes),
+         date_of_hospitalization = guess_dates(dateadmissioncte),
+         date_of_outcome = guess_dates(datededeces))
 
 ```
 
 
 
+<!-- ====================================================== -->
+## Age variable standardization
 
+Here we ensure that all age info is captured in one field `age_years` across all datasets.
+
+```{r clean_age}
+cases <- cases %>%
+  mutate(age_years = case_when(
+                        is.na(age_years) ~ (age_months / 12),
+                        TRUE ~ age_years))
+
+contacts <- contacts %>%
+  mutate(age_years = case_when(
+                        is.na(age_years) ~ (age_months / 12),
+                        TRUE ~ age_years))
+```
 
 <!-- ====================================================== -->
 ## Adding new variables
@@ -297,7 +342,7 @@ rio::export(cases,
             file.path("produced_rds", cases_rds_file_name))
 
 
-## export cases relationships file
+## export relationships file
 relationships_rds_file_name <- sprintf(
     "%sclean_%s.rds",
     undated_file_name(relationships_file),
@@ -306,6 +351,29 @@ relationships_rds_file_name <- sprintf(
 relationships_rds_file_name
 rio::export(relationships,
             file.path("produced_rds", relationships_rds_file_name))
+
+
+
+## export contacts file
+contacts_rds_file_name <- sprintf(
+    "%sclean_%s.rds",
+    undated_file_name(contacts_file),
+    format(database_date, "%Y-%m-%d"))
+
+contacts_rds_file_name
+rio::export(contacts,
+            file.path("produced_rds", contacts_rds_file_name))
+
+
+## export followups file
+followups_rds_file_name <- sprintf(
+    "%sclean_%s.rds",
+    undated_file_name(followups_file),
+    format(database_date, "%Y-%m-%d"))
+
+followups_rds_file_name
+rio::export(followups,
+            file.path("produced_rds", followups_rds_file_name))
 
 
 ```
@@ -317,7 +385,9 @@ We copy these files to the `data/clean` folder:
 ## loop over files to copy
 
 files <- c(cases_rds_file_name,
-           relationships_rds_file_name)
+           relationships_rds_file_name,
+           contacts_rds_file_name,
+           followups_rds_file_name)
 
 for (e in files) {
   destination <- here("data",
@@ -351,6 +421,7 @@ txt <- sprintf("\n## This file was last updated on the: %s\n",
                Sys.time())
 cat(txt, file = script_destination, append = TRUE)
 
+
 ## add to script: cases file
 txt <- sprintf('\ncurrent_clean_cases <- here::here("data",
                                   "clean",
@@ -358,11 +429,28 @@ txt <- sprintf('\ncurrent_clean_cases <- here::here("data",
                cases_rds_file_name)
 cat(txt, file = script_destination, append = TRUE)
 
+
 ## add to script: relationships file
 txt <- sprintf('\ncurrent_clean_relationships <- here::here("data",
                                                 "clean",
                                                 "%s")',
                relationships_rds_file_name)
+cat(txt, file = script_destination, append = TRUE)
+
+
+## add to script: contacts file
+txt <- sprintf('\ncurrent_clean_contacts <- here::here("data",
+                                                "clean",
+                                                "%s")',
+               contacts_rds_file_name)
+cat(txt, file = script_destination, append = TRUE)
+
+
+## add to script: followups file
+txt <- sprintf('\ncurrent_clean_followups <- here::here("data",
+                                                "clean",
+                                                "%s")',
+               followups_rds_file_name)
 cat(txt, file = script_destination, append = TRUE)
 
 
