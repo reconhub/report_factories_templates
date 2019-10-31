@@ -12,3 +12,4 @@ followups_file <- get_latest_data("followups", raw_folder)
 
 
 
+

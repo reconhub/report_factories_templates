@@ -1,5 +1,5 @@
 ---
-title: "Epicurves"
+title: "Data cleaning"
 author: "Thibaut Jombart and Sara Hollis"
 date: "`r format(Sys.time(), '%A %d %B %Y')`"
 output:
@@ -47,12 +47,11 @@ output:
 
 ## Outline
 
-This report produces basic epicurves by dates of onset or reporting, with
-various stratification, from the cleaned Master linelist database.
+This is the universal cleaning script for raw data exported from godata.
 
 ### Data used
 
-This report uses the latest cleaned Master linelist data.
+This report uses the latest exported .xlsx from godata.
 
 ### Method
 
@@ -117,6 +116,8 @@ We extract the completion date from the file names, for:
 
 3. relationships between cases and contacts
 
+4. contact follow up data
+
 
 ```{r load_data}
 
@@ -135,6 +136,11 @@ contacts <- custom_import(contacts_file) %>%
 ## step 3
 relationships_file
 relationships <- custom_import(relationships_file) %>%
+  as_tibble()
+
+## step 4
+followups_file
+followups <- custom_import(followups_file) %>%
   as_tibble()
 
 ```
@@ -175,6 +181,7 @@ ascii match.
 cases <- clean_data(cases, guess_dates = FALSE)
 contacts <- clean_data(contacts, guess_dates = FALSE)
 relationships <- clean_data(relationships, guess_dates = FALSE)
+followups <- clean_data(followups, guess_dates = FALSE)
 
 ```
   
@@ -193,13 +200,55 @@ cases <- cases %>%
   mutate(date_of_reporting = guess_dates(date_of_reporting),
          date_of_onset = guess_dates(date_of_onset),
          date_of_outcome = guess_dates(date_of_outcome),
-         date_of_infection = guess_dates(date_of_infection))
+         date_of_infection = guess_dates(date_of_infection),
+         date_of_becoming_case = guess_dates(date_of_becoming_case),
+        ## date_of_becoming_contact = guess_dates(date_of_becoming_contact),
+         date_of_burial = guess_dates(date_of_burial),
+         date_of_case_notification = guess_dates(date_de_notification_du_cas))
+
+contacts <- contacts %>%
+  mutate(date_of_reporting = guess_dates(date_of_reporting),
+         date_of_data_entry = guess_dates(created_at),
+         date_of_becoming_case = guess_dates(date_of_becoming_case),
+         ##date_of_becoming_contact = guess_dates(date_of_becoming_contact),
+         ##date_of_infection = guess_dates(date_of_infection),
+         date_of_onset = guess_dates(date_of_onset),
+         ##date_of_outcome = guess_dates(date_of_outcome),
+         ##date_of_burial = guess_dates(date_of_burial),
+         date_of_followup_start = guess_dates(start_of_the_followup),
+         date_of_followup_end = guess_dates(end_of_the_followup),
+         date_of_last_contact = guess_dates(date_of_last_contact))
+
+relationships <- relationships %>%
+  mutate(date_of_data_entry = guess_dates(created_at),
+         date_of_last_contact = guess_dates(date_of_last_contact))
+
+followups <- followups %>%
+  mutate(date_of_data_entry = guess_dates(created_at),
+         date_of_followup = guess_dates(date),
+         date_of_onset = guess_dates(dateapparitionsignes),
+         ##date_of_case_notification = guess_dates(datenotification),
+         date_of_hospitalization = guess_dates(dateadmissioncte),
+         date_of_outcome = guess_dates(datededeces))
 
 ```
 
+<!-- ====================================================== -->
+## Age variable standardization
 
+Here we ensure that all age info is captured in one field `age_years` across all datasets.
 
+```{r clean_age}
+cases <- cases %>%
+  mutate(age_years = case_when(
+                        is.na(age_years) ~ (age_months / 12),
+                        TRUE ~ age_years))
 
+contacts <- contacts %>%
+  mutate(age_years = case_when(
+                        is.na(age_years) ~ (age_months / 12),
+                        TRUE ~ age_years))
+```
 
 <!-- ====================================================== -->
 ## Adding new variables
