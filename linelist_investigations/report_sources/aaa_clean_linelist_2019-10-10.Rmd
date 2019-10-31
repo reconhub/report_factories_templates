@@ -448,10 +448,7 @@ x <- x %>%
          date_onset,
          date_report,
          date_admission,
-         ## date_outcome,
-         ## date_discharge,
          date_death,
-         ## date_outcome,
          date_exposure_start,
          date_exposure_end,
          province,
@@ -461,9 +458,6 @@ x <- x %>%
          age,
          age_class,
          hcw,
-         ## delay_outcome,
-         ## duration_hospitalisation,
-         ## documented_hospitalisation,
          everything())
 
 ```
