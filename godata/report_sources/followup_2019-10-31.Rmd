@@ -167,6 +167,22 @@ table_missing_contacts %>%
 
 
 
+
+## Adding variables
+
+We add to `followup` the following variables:
+
+* `seen`: a logical indicating if patient was seen
+* `date_seen`: the date of the followup, if seen; `NA` otherwise
+
+```{r add_variables}
+
+followups <- followups %>%
+  mutate(seen = status %in% c("seen_no_signs", "seen_with_signs"),
+         date_seen = if_else(seen, date_of_followup, as.Date(NA)))
+
+```
+
   
 <!-- ====================================================== -->
 ## Filtering
@@ -207,17 +223,14 @@ including:
 ```{r join}
 
 info_for_merging <- contacts %>%
-  select(id, date_of_followup_start) %>%
+  select(id, date_of_last_contact, date_of_followup_start) %>%
   mutate(date_of_followup_end = date_of_followup_start + 20)
 
 followups <- followups %>%
   right_join(info_for_merging,
              by = c("lng_follow_up_field_label_contact_id" = "id"))
 
-
 ```
-
-
 
 
 

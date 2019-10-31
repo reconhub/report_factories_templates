@@ -262,6 +262,8 @@ In the following we add variables to the datasets:
     * `epiweek_report_label`: the epiweek for the date of reporting
     * `epiweek_report` the first day of the epiweek for the date of reporting
     * `age_class`
+* `followups`
+    + `uid`: unique identifier for matching in `contacts$id` (long form)
 
 ```{r new_variables}
 
@@ -304,6 +306,10 @@ cases <- cases %>%
       age_class_plot = factor(
           age_class,
           levels = rev(levels(age_class))))
+
+
+followups <- followups %>%
+  mutate(uid = lng_follow_up_field_label_contact_id)
 
 ```
 
