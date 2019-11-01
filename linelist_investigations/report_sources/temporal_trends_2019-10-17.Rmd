@@ -184,6 +184,7 @@ In this part we define custom colors and color scales for further plotting.
 color_known_contact <- "#117A65"
 color_followed_contact <- "#073a30"
 color_community_death <- "#DD5327"
+color_nosocomial_death <- "#d10f40"
 color_hcw <- "#8A0829"
 
 ```
@@ -1269,6 +1270,366 @@ table_community_deaths_top_zones_time %>%
 
 
 
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# Nosocomial deaths {.tabset .tabset-fade .tabset-pills}
+
+<!-- ======================================================= -->
+## Outline 
+
+We use the variable `place_death_crude` which is derived from the 
+variable `place_of_death` to estimate the proportions of cases
+who are known to have died in a health facility (which is a subset
+of the community or non-CTE deaths):
+
+* overall, weekly 
+* by sub-coordination, monthly
+* for the main recently active health zones, monthly
+
+Each analysis will present:
+
+* overall results aggregated for the whole time period
+* a temporal breakdown
+
+For each proportion, we derive the exact binomial confidence interval.
+
+
+
+<!-- ======================================================= -->
+## Note
+
+We will rely on `adorn_totals` for computing totals. This approach needs to take into account an
+[issue](https://github.com/sfirke/janitor/issues/285) with `adorn_totals`, which
+ignores the first column of data assuming it is a grouping factor. This will not
+be a problem for further stratification, where the function can be used safely.
+
+
+
+<!-- ======================================================= -->
+## Overall
+
+The analysis proceeds with the following steps:
+
+1. calculate overall numbers and corresponding proportions and confidence
+intervals
+
+2. calculate weekly numbers and corresponding proportions and confidence
+intervals
+
+3. plot temporal trends
+
+4. create a table from 1, renaming columns and displaying it 
+
+5. create a table from 2, renaming columns and displaying it 
+
+
+```{r nosocomial_deaths_overall}
+
+## step 1
+nosocomial_deaths_overall <- x %>%
+  count(place_death_crude) %>%
+  spread(place_death_crude, n, fill = 0, drop = FALSE) %>%
+  mutate(total = nrow(x), # avoid adorn_totals
+         denom = total - unknown,
+         p = prop_to_perc(community_hcf / denom),
+         p_lower = prop_ci(community_hcf, denom, "lower", perc = TRUE),
+         p_upper = prop_ci(community_hcf, denom, "upper", perc = TRUE))
+
+
+## step 2
+nosocomial_deaths_overall_time <- x %>%
+  count(epiweek_report_label, place_death_crude) %>%
+  spread(place_death_crude, n, fill = 0, drop = FALSE) %>%
+  adorn_totals(c("col"), name = "total") %>% 
+  mutate(denom = total,
+         p = prop_to_perc(community_hcf / denom),
+         p_lower = prop_ci(community_hcf, denom, "lower", perc = TRUE),
+         p_upper = prop_ci(community_hcf, denom, "upper", perc = TRUE))
+
+
+## step 3
+ggplot(nosocomial_deaths_overall_time, aes(x = epiweek_report_label, y = p)) +
+  theme_bw() +
+  geom_ribbon(aes(ymin = p_lower, ymax = p_upper),
+              alpha = .3, fill = color_nosocomial_death) +
+  geom_point(color = color_nosocomial_death) +
+  geom_line(color = color_nosocomial_death) +
+  scale_y_continuous(limits = c(0, 100)) +
+  scale_months +
+  rotate_x_text(45) +
+  large_txt +
+  labs(title = "Proportion de décès nosocomial",
+       x = "Semaine de notification",
+       y = "% de cas hebdomadaires décès nosocomial")
+
+
+## step 4
+table_nosocomial_deaths_overall <- nosocomial_deaths_overall %>% 
+  select("% nosocomial_death connu" = p,
+         "IC95% lower" = p_lower,
+         "IC95% upper" = p_upper,
+         n = denom,
+         everything())
+
+table_nosocomial_deaths_overall %>%
+  show_table()
+
+
+# step 5
+table_nosocomial_deaths_overall_time <- nosocomial_deaths_overall_time %>% 
+  select(semaine = epiweek_report_label,
+         "% nosocomial_death connu" = p,
+         "IC95% lower" = p_lower,
+         "IC95% upper" = p_upper,
+         n = denom,
+         everything())
+
+table_nosocomial_deaths_overall_time %>%
+  show_table()
+
+```
+
+
+
+
+
+
+<!-- ======================================================= -->
+## By sub-coordination
+
+The analysis proceeds with the following steps:
+
+1. calculate numbers by sub-coordination and corresponding proportions and
+confidence intervals
+
+2. calculate monthly numbers and corresponding proportions and confidence
+intervals
+
+3. plot overall numbers by sub-coordination
+
+4. plot temporal trends, retaining only sub-coordinations for which the average
+monthly uncertainty is less than 60%
+
+5. create a table from 1, renaming columns and displaying it 
+
+6. create a table from 2, renaming columns and displaying it 
+
+
+```{r nosocomial_deaths_sub_coordination}
+
+## step 1
+nosocomial_deaths_sub_coordination <- x %>%
+  count(sous_coordination, place_death_crude) %>%
+  spread(place_death_crude, n, fill = 0, drop = FALSE) %>%
+  adorn_totals("col", name = "total") %>% 
+  mutate(denom = total,
+         p = prop_to_perc(community_hcf / denom),
+         p_lower = prop_ci(community_hcf, denom, "lower", perc = TRUE),
+         p_upper = prop_ci(community_hcf, denom, "upper", perc = TRUE))
+
+
+## step 2
+nosocomial_deaths_sub_coordination_time <- x %>%
+  count(sous_coordination, month_report, place_death_crude) %>%
+  spread(place_death_crude, n, fill = 0) %>%
+  adorn_totals(c("col"), name = "total") %>% 
+  mutate(denom = total,
+         p = prop_to_perc(community_hcf / denom),
+         p_lower = prop_ci(community_hcf, denom, "lower", perc = TRUE),
+         p_upper = prop_ci(community_hcf, denom, "upper", perc = TRUE))
+
+
+## step 3
+ggplot(nosocomial_deaths_sub_coordination, aes(x = sous_coordination, y = p)) +
+  theme_bw() +
+  geom_errorbar(aes(ymin = p_lower, ymax = p_upper),
+                color = color_nosocomial_death) +
+  geom_point(color = color_nosocomial_death, size = 2) +
+  geom_label(aes(y = p_upper + 10, label = paste0("n=", denom))) +
+  large_txt +
+  coord_flip() +
+  scale_y_continuous(breaks = seq(0, 100, by = 20),
+                     limit = c(0, 110)) +
+  labs(title = "Proportion de décès nosocomial\npar sous-coordination",
+       x = "",
+       y = "% de décès nosocomial")
+
+
+## step 4
+to_keep <- nosocomial_deaths_sub_coordination_time %>%
+  group_by(sous_coordination) %>%
+  filter(mean(p_upper - p_lower) < 60) %>%
+  pull(sous_coordination) %>%
+  unique()
+
+nosocomial_deaths_sub_coordination_time %>%
+  filter(sous_coordination %in% to_keep) %>% 
+ggplot(aes(x = month_report, y = p)) +
+  theme_bw() +
+  geom_ribbon(aes(ymin = p_lower, ymax = p_upper),
+              alpha = .3, fill = color_nosocomial_death) +
+  geom_point(color = color_nosocomial_death) +
+  geom_line(color = color_nosocomial_death) +
+  scale_y_continuous(limits = c(0, 100)) +
+  scale_months +
+  rotate_x_text(45) +
+  facet_wrap(sous_coordination ~ ., nrow = 2) +
+  large_txt +
+  custom_vert_facet +
+  labs(title = "Proportion de décès nosocomial",
+       x = "Mois de notification",
+       y = "% de décès nosocomial")
+
+
+## step 5
+table_nosocomial_deaths_sub_coordination <- nosocomial_deaths_sub_coordination %>% 
+  select(sous_coordination,
+         "% nosocomial_death connu" = p,
+         "IC95% lower" = p_lower,
+         "IC95% upper" = p_upper,
+         n = denom,
+         everything())
+
+table_nosocomial_deaths_sub_coordination %>%
+  show_table()
+
+
+# step 6
+table_nosocomial_deaths_sub_coordination_time <- nosocomial_deaths_sub_coordination_time %>% 
+  select(mois = month_report,
+         sous_coordination,
+         "% nosocomial_death connu" = p,
+         "IC95% lower" = p_lower,
+         "IC95% upper" = p_upper,
+         n = denom,
+         everything())
+
+table_nosocomial_deaths_sub_coordination_time %>%
+  show_table()
+
+```
+
+
+
+<!-- ======================================================= -->
+## By top zones
+
+The analysis proceeds with the following steps:
+
+1. calculate numbers by zone and corresponding proportions and
+confidence intervals, constrained to top zones in recent 42 days
+
+2. calculate monthly numbers and corresponding proportions and confidence
+intervals
+
+3. plot overall numbers by zone, constrained to top zones in recent 42 days
+
+4. plot temporal trends, retaining only zones for which the average
+monthly uncertainty is less than 60%
+
+5. create a table from 1, renaming columns and displaying it 
+
+6. create a table from 2, renaming columns and displaying it 
+
+
+```{r nosocomial_deaths_top_zones}
+
+## step 1
+nosocomial_deaths_top_zones <- x %>%
+  count(top_zones, place_death_crude) %>%
+  spread(place_death_crude, n, fill = 0, drop = FALSE) %>%
+  adorn_totals("col", name = "total") %>% 
+  mutate(denom = total,
+         p = prop_to_perc(community_hcf / denom),
+         p_lower = prop_ci(community_hcf, denom, "lower", perc = TRUE),
+         p_upper = prop_ci(community_hcf, denom, "upper", perc = TRUE))
+
+
+## step 2
+nosocomial_deaths_top_zones_time <- x %>%
+  count(top_zones, month_report, place_death_crude) %>%
+  spread(place_death_crude, n, fill = 0) %>%
+  adorn_totals(c("col"), name = "total") %>% 
+  mutate(denom = total,
+         p = prop_to_perc(community_hcf / denom),
+         p_lower = prop_ci(community_hcf, denom, "lower", perc = TRUE),
+         p_upper = prop_ci(community_hcf, denom, "upper", perc = TRUE))
+
+
+## step 3
+ggplot(nosocomial_deaths_top_zones, aes(x = top_zones, y = p)) +
+  theme_bw() +
+  geom_errorbar(aes(ymin = p_lower, ymax = p_upper),
+                color = color_nosocomial_death) +
+  geom_point(color = color_nosocomial_death, size = 2) +
+  geom_label(aes(y = p_upper + 10, label = paste0("n=", denom))) +
+  large_txt +
+  coord_flip() +
+  scale_y_continuous(breaks = seq(0, 100, by = 20),
+                     limit = c(0, 110)) +
+  labs(title = "Proportion de décès nosocomial\npar zone de santé",
+       x = "",
+       y = "% de décès nosocomial")
+
+
+## step 4
+to_keep <- nosocomial_deaths_top_zones_time %>%
+  group_by(top_zones) %>%
+  filter(mean(p_upper - p_lower) < 60) %>%
+  pull(top_zones) %>%
+  unique()
+
+nosocomial_deaths_top_zones_time %>%
+  filter(top_zones %in% to_keep) %>% 
+ggplot(aes(x = month_report, y = p)) +
+  theme_bw() +
+  geom_ribbon(aes(ymin = p_lower, ymax = p_upper),
+              alpha = .3, fill = color_nosocomial_death) +
+  geom_point(color = color_nosocomial_death) +
+  geom_line(color = color_nosocomial_death) +
+  scale_y_continuous(limits = c(0, 100)) +
+  scale_months +
+  rotate_x_text(45) +
+  facet_wrap(top_zones ~ ., nrow = 2) +
+  large_txt +
+  custom_vert_facet +
+  labs(title = "Proportion de décès nosocomial",
+       x = "Mois de notification",
+       y = "% de décès nosocomial")
+
+
+## step 5
+table_nosocomial_deaths_top_zones <- nosocomial_deaths_top_zones %>% 
+  select(top_zones,
+         "% nosocomial_death connu" = p,
+         "IC95% lower" = p_lower,
+         "IC95% upper" = p_upper,
+         n = denom,
+         everything())
+
+table_nosocomial_deaths_top_zones %>%
+  show_table()
+
+
+# step 6
+table_nosocomial_deaths_top_zones_time <- nosocomial_deaths_top_zones_time %>% 
+  select(mois = month_report,
+         top_zones,
+         "% nosocomial_death connu" = p,
+         "IC95% lower" = p_lower,
+         "IC95% upper" = p_upper,
+         n = denom,
+         everything())
+
+table_nosocomial_deaths_top_zones_time %>%
+  show_table()
+
+```
+
+
+
+
 
 <!-- ======================================================= -->
 <!-- ======================================================= -->
@@ -1532,7 +1893,7 @@ where 'n' excludes 'unknown'. Here, we plot:
 completeness <- data.frame(
     known_contact = 100 * contacts_overall$denom / contacts_overall$total,
     followed = 100 * followed_overall$denom / followed_overall$total,
-    community_deaths = 100 * community_deaths_overall$denom / community_deaths_overall$total,
+    community_or_nosocomial_deaths = 100 * community_deaths_overall$denom / community_deaths_overall$total,
     hcw_cases = 100 * hcw_overall$denom / hcw_overall$total) %>%
   gather(labels, completeness) 
 
@@ -1588,6 +1949,12 @@ to_export <- c("table_contacts_overall",
                "table_community_deaths_sub_coordination_time",
                "table_community_deaths_top_zones",
                "table_community_deaths_top_zones_time",
+               "table_nosocomial_deaths_overall",
+               "table_nosocomial_deaths_overall_time",
+               "table_nosocomial_deaths_sub_coordination",
+               "table_nosocomial_deaths_sub_coordination_time",
+               "table_nosocomial_deaths_top_zones",
+               "table_nosocomial_deaths_top_zones_time",
                "table_hcw_overall",
                "table_hcw_overall_time",
                "table_hcw_sub_coordination",
