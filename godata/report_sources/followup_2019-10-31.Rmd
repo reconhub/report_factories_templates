@@ -326,13 +326,13 @@ In this part we get contact classification for the current day of the database,
 i.e. **`r format(database_date, format = "%d %B %Y")`**.
 
 
-```{r classification_current}
+```{r table_classification_current}
 
-classification_current <- classify_contacts(contacts, followups, on = database_date)
-classification_current %>%
+table_classification_current <- classify_contacts(contacts, followups, on = database_date)
+table_classification_current %>%
   count(classification)
 
-classification_current %>%
+table_classification_current %>%
   show_table()
 
 ```
@@ -493,6 +493,43 @@ days**, with an IQR of **`r round(mean(duration_followup), 1)` days**.
 <!-- ======================================================= -->
 <!-- ======================================================= -->
 <!-- ======================================================= -->
+# Contacts to follow {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+
+## Analyses by location
+
+```{r contacts_to_follow}
+
+table_contacts_to_follow <- contacts %>%
+  filter(date_of_followup_end >= database_date)
+
+ggplot(table_contacts_to_follow, aes(x = location_1)) +
+  geom_bar() +
+  theme_bw() +
+  coord_flip() +
+  large_txt +
+  labs(title = sprintf("Nombre de contacts à suirve \nau %s",
+                       format(database_date, "%d %B %Y")),
+       x = "",
+       y = "Contacts à suivre")
+
+table_contacts_to_follow %>%
+  count(location_1) %>%
+  show_table()
+
+table_contacts_to_follow %>%
+  show_table()
+
+```
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
 
 # Export tables {.tabset .tabset-fade .tabset-pills}
 
@@ -503,14 +540,16 @@ Provide an outline of exported files.
 
 ## Excel files
 
-```{r xlsx_exports, eval = FALSE}
+```{r xlsx_exports}
 
 if (!dir.exists("produced_xlsx")) {
   dir.create("produced_xlsx")
 }
 
-to_export <- c("table_",
-               "table_")
+to_export <- c("table_followup_time",
+               "table_classification_current",
+               "table_classification_time",
+               "table_contacts_to_follow")
 
 for (e in to_export) {
   rio::export(get(e),
@@ -524,7 +563,7 @@ Click on the following links to open the files (only works if the files above
 have been generated and are in the same folder as this document):
 
 
-```{r links, results = "asis", eval = FALSE}
+```{r links, results = "asis"}
 
 for (e in to_export) {
   txt <- sprintf("- [%s.xlsx](%s.xlsx)",
