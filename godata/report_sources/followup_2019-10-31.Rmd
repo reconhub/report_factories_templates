@@ -228,8 +228,8 @@ info_for_merging <- contacts %>%
   mutate(date_of_followup_end = date_of_followup_start + 20)
 
 followups <- followups %>%
-  right_join(info_for_merging,
-             by = c("uid" = "id"))
+  left_join(info_for_merging,
+            by = c("uid" = "id"))
 
 ```
 
@@ -281,7 +281,7 @@ scale_classification <- scale_fill_manual(
 <!-- ===================================================== -->
 <!-- ===================================================== -->
 <!-- ===================================================== -->
-# Follow-up completion {.tabset .tabset-fade .tabset-pills}
+# Contact classification {.tabset .tabset-fade .tabset-pills}
 
 <!-- ===================================================== -->
 ## Outline
@@ -399,15 +399,26 @@ table_classification_time%>%
 
 
 
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+<!-- ===================================================== -->
+# Delays {.tabset .tabset-fade .tabset-pills}
+
+<!-- ===================================================== -->
+## Outline
+
+
 <!-- ======================================================= -->
 ## Delays to follow-up
 
 ```{r delays_to_followup}
 
-info_seen_dates <- select(classification_time,
-                          id,
-                          first_seen = first_seen_global,
-                          last_seen = last_seen_global)
+starting_date <- database_date - 20
+
+info_seen_dates <- classification_time %>%
+  group_by(id) %>%
+  summarise(first_seen = unique(first_seen_global),
+            last_seen = unique(last_seen_global))
 
 contacts <- left_join(contacts, info_seen_dates)
 
@@ -436,6 +447,43 @@ delay_followup %>%
 
 The **average** delay to follow-up is **`r round(mean(delay_followup), 1)`
 days**, with an IQR of **`r round(mean(delay_followup), 1)` days**.
+
+
+
+
+
+
+
+<!-- ======================================================= -->
+## Duration of follow-up
+
+```{r followup_duration}
+
+contacts <- contacts %>%
+  mutate(followup_duration = as.integer(last_seen - first_seen + 1),
+         followup_duration = ifelse(is.na(followup_duration), 0, followup_duration))
+
+contacts %>%
+  filter(date_of_last_contact >= starting_date) %>% 
+ggplot(aes(x = followup_duration)) +
+  geom_bar() +
+  theme_bw() +
+  large_txt +
+  labs(title = "Durée du suivi des contacts (21 derniers jours)",
+       y = "Nombre de contacts",
+       x = "Nombre de jours entre premier et dernier suivi")
+
+## summary of the duration of follow-up
+duration_followup <- contacts$followup_duration %>%
+  na.omit() %>%
+  as.integer()
+duration_followup %>%
+  summary()
+
+```
+
+The **average** duration to follow-up is **`r round(mean(duration_followup), 1)`
+days**, with an IQR of **`r round(mean(duration_followup), 1)` days**.
 
 
 
