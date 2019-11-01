@@ -33,7 +33,7 @@ knitr::opts_chunk$set(echo = TRUE,
 
 **Code contributors:** Thibaut Jombart, Chris Jarvis
 
-**Data contributors:** Richie Ngombo, Yannick Tutu
+**Data contributors:** Richy Ngombo, Yannick Tutu
 
 **Version:** 1.0.0
 
@@ -103,7 +103,7 @@ These scripts will load:
 ## read scripts
 path_to_scripts <- here::here("scripts")
 scripts_files <- dir(path_to_scripts, pattern = ".R$", full.names = TRUE)
-for (file in scripts_files) source(file)
+for (file in scripts_files) source(file, local = TRUE)
 
 ggthemr("grape")
 

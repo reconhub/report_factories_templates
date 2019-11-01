@@ -73,6 +73,15 @@ reportfactory::install_deps()
 reportfactory::update_reports(clean_report_sources = TRUE)
 ```
 
+By default, reports are produced using a `light` option, which produces lighter,
+low-resolution figures. For better quality, you can set that option to `FALSE`
+through `params` by typing:
+
+
+```r
+reportfactory::update_reports(clean_report_sources = TRUE, params = list(light = FALSE))
+```
+
 
 
 
@@ -127,11 +136,80 @@ indicate which type of data to compare using:
 
 
 ```r
-reportfactory::update_reports(clean_report_sources = TRUE, params(type = "xxx"))
+reportfactory::update_reports(clean_report_sources = TRUE, params = list(type = "xxx"))
 ```
 
 where `xxx` is a character string uniquely present in the type of data to use.
 
+
+
+
+
+<br>
+
+***************************
+
+<!-- ========================================== -->
+## *GoData*
+
+### Outline
+
+This factory performs analyses of data gathered using GoData2, including:
+
+* *cases* data
+* *contact tracing* data
+* *relationships* between cases / contacts
+
+The factory is designed for data gathered during the 2019 Ebola outbreak in
+Eastern DRC. Because of data confidentiality issues, we cannot share the data
+from the outbreak. Adaptations will be needed for new datasets.
+
+This factory includes the following:
+
+* `aaa_clean_data`: data cleaning, outputting clean datasets and specifying
+  their paths as global variables defined in `scripts/current_clean_data.R`
+  
+* `epicurves`: epidemic curves for the cases with various stratification
+
+* `transmission_chains`: chains of transmission between cases
+
+* `followup`: contact tracing followup
+
+
+
+### How to use it?
+
+Clone or [download](https://github.com/reconhub/report_factories_templates/archive/master.zip) the factory, make sure the **reportfactory** is installed, then:
+
+1. put the data for *cases*, *contacts* and *relationships*  in
+   `data/raw/[cases/contacts/relationships]_[date].xlsx` where `[date]` has the
+   `yyyy-mm-dd` format
+   
+2. open **R** in the root factory folder or simply double-click on the
+   `open.Rproj` file
+   
+3. (first time only) install dependencies by typing:
+
+
+```r
+reportfactory::install_deps()
+```
+
+4. run the factory by typing:
+
+
+```r
+reportfactory::update_reports(clean_report_sources = TRUE)
+```
+
+By default, reports are produced using a `light` option, which produces lighter,
+low-resolution figures. For better quality, you can set that option to `FALSE`
+through `params` by typing:
+
+
+```r
+reportfactory::update_reports(clean_report_sources = TRUE, params = list(light = FALSE))
+```
 
 
 
@@ -213,6 +291,91 @@ reportfactory::install_deps()
 ```r
 reportfactory::update_reports(clean_report_sources = TRUE)
 ```
+
+By default, reports are produced using a `light` option, which produces lighter,
+low-resolution figures. For better quality, you can set that option to `FALSE`
+through `params` by typing:
+
+
+```r
+reportfactory::update_reports(clean_report_sources = TRUE, params = list(light = FALSE))
+```
+
+
+
+
+
+<br>
+
+***************************
+
+<!-- ========================================== -->
+## *transmission_chains*
+
+### Outline
+
+This factory performs analyses of transmission chains from the 2019 Ebola
+outbreak in Eastern DRC. It is used by the Analytics Cell based at the
+coordination of the Emergency Operations Centre (EOC). Because of data
+confidentiality issues, we cannot share the data from the outbreak. Adaptations
+will be needed for new datasets.
+
+This factory includes the following:
+
+* construction of transmission chains as an *epicontacts* object, from separate
+  files describing cases (master linelist) and transmission events (master
+  transmission list)
+  
+* interactive plots of chains
+
+* inspection and quality checks on the chains
+
+* computation of effective reproduction number distribution
+
+* computation of transmissions across genders, age classes, health zones and
+  health areas
+  
+
+
+### How to use it?
+
+Clone or [download](https://github.com/reconhub/report_factories_templates/archive/master.zip) the factory, make sure the **reportfactory** is installed, then:
+
+1. put the *clean master linelist* in
+   `data/clean/master_linelist_clean_[date].rds` where `[date]` has the
+   `yyyy-mm-dd` format
+   
+2. put the *raw master transmission list* data in
+   `data/raw/master_transmission_list_[date].xlsx` where `[date]` has the
+   `yyyy-mm-dd` format
+
+3. open **R** in the root factory folder or simply double-click on the
+   `open.Rproj` file
+   
+4. (first time only) install dependencies by typing:
+
+
+```r
+reportfactory::install_deps()
+```
+
+5. run the factory by typing:
+
+
+```r
+reportfactory::update_reports(clean_report_sources = TRUE)
+```
+
+By default, reports are produced using a `light` option, which produces lighter,
+low-resolution figures. For better quality, you can set that option to `FALSE`
+through `params` by typing:
+
+
+```r
+reportfactory::update_reports(clean_report_sources = TRUE, params = list(light = FALSE))
+```
+
+
 
 
 
@@ -369,7 +532,7 @@ weak points. This will involve the following steps:
 git fetch
 
 ## create a local branch matching that of the PR, and move to it
-git checkout xxx
+git checkout -b xxx
    
 ```
 

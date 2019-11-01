@@ -29,7 +29,7 @@ output:
   **Code contributors:** Thibaut Jombart, Christopher Jarvis, Patrick Keating, Sham
   Lal, Charlie Whittaker, Amy Gimma
   
-  **Data contributors:** Yannick Tutu, Richie Ngombo
+  **Data contributors:** Yannick Tutu, Richy Ngombo
   
   **Version:** 2.1.0
   
