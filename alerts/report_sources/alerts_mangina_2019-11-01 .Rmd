@@ -314,7 +314,7 @@ unknown_as_3weeks <- x %>%
 ```
 
 
-There are `r nrow(unknown_as)` unknown aire de santes with the latest being `r most_recent_unknown_as`. There are `r nrow(unknown_as_3weeks)` alerts in the last 3 weeks with an unknown aire de santes in the database.
+There are `r nrow(unknown_as)` alerts with unknown aire de santes with the latest being `r most_recent_unknown_as`. There are `r nrow(unknown_as_3weeks)` alerts in the last 3 weeks with an unknown aire de santes in the database.
 
 ```{r show_unknown_area_names}
 
