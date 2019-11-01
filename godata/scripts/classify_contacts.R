@@ -21,35 +21,56 @@
 #' 
 
 
-classify_contact <- function(contacts, followup, on, symbol = "x") {
+classify_contact <- function(contacts, followup, on) {
 
   ## Overall strategy:
   ##
-  ## 1. retain only followup data prior to day of investigation ('on')
+  ## 1. on the whole data, find what the first and last days each contact has
+  ## been seen; if this is NA, this means the contact was truly never seen
   ##
-  ## 2. for each contact, find their most recent exposure
-  ## 
-  ## 2. define active / non_active contacts
+  ## 2. retain only followup data prior to day of investigation ('on'); some
+  ## individuals may be never seen on the time period retained, but seen later;
+  ## these will be the `not_seen_yet` contacts
   ##
-  ## 2. find for each contacts the last day they were seen
+  ## 3. based on the date of last exposure, define active / non_active contacts,
+  ## and keep only active contacts
   ##
-  ## 3. 
+  ## 4. find the last day each contact was seen on the data retained; NAs could
+  ## come from contacts that are truly never seen, or who will be seen in the
+  ## future
+  ##
+  ## 5. based the delay since last followup, get classifications for all
+  ## contacts
+  ##
   
 
-  ## remove followup data posterior to day for which we classify data
+  ## data preparation; `x` will be our working table, each row being a unique
+  ## active contact, with columns containing information usefull for the
+  ## classification
+  
+  x <- select(contacts, id, date_of_last_contact)
+
+  
+  ## step 1
+  seen_info_global <- followups %>%
+    group_by(uid) %>%
+    summarise(first_seen_global = min(date_seen, na.rm = TRUE),
+              last_seen_global = max(date_seen, na.rm = TRUE))
+  x <- left_join(x, seen_info_global, by = c("id" = "uid"))
+
+  
+  ## step 2
   followup <- filter(followup, date_of_followup < on)
 
 
-  ## for each contact, find their most recent exposure
-  x <- select(contacts, id, date_of_last_contact)
-
-  ## define active / non_active contacts, keep only active contacts
+  ## step 3
   x <- filter(x, active_on(date_of_last_contact, on))
 
-  ## find for each contacts the last day they were seen
+  
+  ## step 4
   last_seen_info <- followups %>%
     group_by(uid) %>%
-    summarise(last_seen = max(date_seen))
+    summarise(last_seen = max(date_seen, na.rm = TRUE))
   x <- left_join(x, last_seen_info, by = c("id" = "uid"))
 
   ## days since last exposure and since seen
@@ -58,15 +79,12 @@ classify_contact <- function(contacts, followup, on, symbol = "x") {
               days_since_last_seen = as.integer(on - last_seen))
 
 
-  ## never seen
+  ## step 5
   x <- mutate(x,
-              never_seen = is.na(last_seen),
-              never_seen_short = is_TRUE(in_range(days_since_exposure, 1, 7)),
-              never_seen_long = is_TRUE(in_range(days_since_exposure, 8, 21)))
-
-
-  ## seen and lost to followup
-  x <- mutate(x,
+              never_seen = is.na(last_seen_global),
+              not_seen_yet = is.na(last_seen) & !never_seen,
+              never_seen_short = never_seen & is_TRUE(in_range(days_since_exposure, 1, 7)),
+              never_seen_long = never_seen & is_TRUE(in_range(days_since_exposure, 8, 21)),
               seen = is_TRUE(days_since_last_seen == 0),
               not_seen = is_TRUE(in_range(days_since_last_seen, 1, 2)),
               lost = is_TRUE(days_since_last_seen >= 3))
@@ -74,6 +92,7 @@ classify_contact <- function(contacts, followup, on, symbol = "x") {
 
   ## final classification
   x <- mutate(x, classification = case_when(
+                     not_seen_yet ~ "pas_encore_vu",
                      seen ~ "vu",
                      not_seen ~ "non_vu",
                      lost ~ "perdu_de_vue",
