@@ -432,20 +432,20 @@ variable which asserts these conditions:
 has_contact <- outcomes$contact_connu %in% c("confirme", "oui")
 has_one_symptom <- outcomes %>%
   select(fievre,
-         nausee_vom,
-         diarrhee,
-         fatigue,
-         anorexie,
-         dlr_abdo,
-         dlr_thorax,
-         dlr_muscu,
-         dlr_artic,
-         cephalee,
+         naus,
+         diarr,
+         asth,
+         anor,
+         abdo,
+         thor,
+         musc,
+         arti,
+         ceph,
          toux,
-         dyspnee,
-         dysphagie,
-         odynophagie,
-         hoquet,
+         resp,
+         aval,
+         gor,
+         hoq,
          bleed) %>%
   apply(1, function(e) any(e == "oui", na.rm = TRUE))
 fits_1 <- has_contact & has_one_symptom
@@ -457,20 +457,20 @@ fits_2 <- !fits_1 & has_bleeding
 ## criteria 3
 has_fever <- outcomes$fievre == "oui"
 has_3_symptoms <- outcomes %>%
-    select(nausee_vom,
-         diarrhee,
-         fatigue,
-         anorexie,
-         dlr_abdo,
-         dlr_thorax,
-         dlr_muscu,
-         dlr_artic,
-         cephalee,
+    select(naus,
+         diarr,
+         asth,
+         anor,
+         abdo,
+         thor,
+         musc,
+         arti,
+         ceph,
          toux,
-         dyspnee,
-         dysphagie,
-         odynophagie,
-         hoquet,
+         resp,
+         aval,
+         gor,
+         hoq,
          bleed) %>% 
   apply(1, function(e) sum(e == "oui", na.rm = TRUE)) >= 3
 fits_3 <- !fits_1 & !fits_2 & has_fever & has_3_symptoms
