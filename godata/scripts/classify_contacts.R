@@ -10,18 +10,17 @@
 #' * `vu`: seen on the considered day
 #' * `non_vu`: not seen for 1-2 days
 #' * `perdu_de_vue`: not seen for 3+ days
+#' * `pas_encore_vu`: will be seen at some point, but never seen until now
 #'
-#' @param x a data.frame of the GoData followups data
+#' @param contacts a `data.frame` of the GoData contacts data
 #' 
-#' @param last_contact the date of last exposure
+#' @param followups a `data.frame` of the GoData followups data
 #' 
 #' @param on the day on which to assess if the contact is active
-#'
-#' @param symbol the symbol indicating that the contact has been followed 
 #' 
 
 
-classify_contact <- function(contacts, followup, on) {
+classify_contacts <- function(contacts, followups, on) {
 
   ## Overall strategy:
   ##
@@ -60,7 +59,7 @@ classify_contact <- function(contacts, followup, on) {
 
   
   ## step 2
-  followup <- filter(followup, date_of_followup < on)
+  followups <- filter(followups, date_of_followup <= on)
 
 
   ## step 3
@@ -80,9 +79,10 @@ classify_contact <- function(contacts, followup, on) {
 
 
   ## step 5
+  ## note: for some reason Date NAs are not seen as such here by `is.na` 
   x <- mutate(x,
-              never_seen = is.na(last_seen_global),
-              not_seen_yet = is.na(last_seen) & !never_seen,
+              never_seen = !is.finite(last_seen_global),
+              not_seen_yet = !is.finite(last_seen) & !never_seen,
               never_seen_short = never_seen & is_TRUE(in_range(days_since_exposure, 1, 7)),
               never_seen_long = never_seen & is_TRUE(in_range(days_since_exposure, 8, 21)),
               seen = is_TRUE(days_since_last_seen == 0),
@@ -100,18 +100,16 @@ classify_contact <- function(contacts, followup, on) {
                      never_seen_long ~ "jamais_vu_long",
                      TRUE ~ "inconnu"
                  ))
-  
+
   out <- select(x,
                 id,
-                classification) %>%
-    mutate(classification = factor(classification),
-                levels = c("vu",
-                           "non_vu",
-                           "perdu_de_vue",
-                           "jamais_vu_court",
-                           "jamais_vu_long",
-                           "inactif",
-                           "inconnu"))
-  out
+                classification,
+                date_of_last_contact,
+                first_seen_global,
+                last_seen_global,
+                last_seen,
+                days_since_exposure,
+                days_since_last_seen)
+  return(out)
 
 }

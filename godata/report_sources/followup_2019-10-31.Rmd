@@ -183,6 +183,7 @@ followups <- followups %>%
 
 ```
 
+
   
 <!-- ====================================================== -->
 ## Filtering
@@ -228,7 +229,7 @@ info_for_merging <- contacts %>%
 
 followups <- followups %>%
   right_join(info_for_merging,
-             by = c("lng_follow_up_field_label_contact_id" = "id"))
+             by = c("uid" = "id"))
 
 ```
 
@@ -252,6 +253,23 @@ scale_status <- scale_fill_manual(
                not_seen = "Non vu",
                seen_no_signs = "Vu, pas de symptômes",
                seen_with_signs = "Vu, symptômes"))
+
+scale_classification <- scale_fill_manual(
+    "",
+    values = c(inconnu = "#8c8c8c",
+               vu = "#79d2a6",
+               non_vu = "#9494b8",
+               perdu_de_vue = "#ff9966",
+               jamais_vu_court = "#ff6666",
+               jamais_vu_long = "#b30000",
+               pas_encore_vu = "#5E9281"),
+    labels = c(inconnu = "Inconnu",
+               vu = "Vu",
+               non_vu = "Non vu",
+               perdu_de_vue = "Perdu de vue",
+               jamais_vu_court = "Jamais vu (court)",
+               jamais_vu_long = "Jamais vu (long)",
+               pas_encore_vu = "Pas encore vu"))
 
 ```
 
@@ -301,7 +319,123 @@ table_followup_time %>%
 
 
 
+<!-- ======================================================= -->
+## Contact classification: today
+
+In this part we get contact classification for the current day of the database,
+i.e. **`r format(database_date, format = "%d %B %Y")`**.
+
+
+```{r classification_current}
+
+classification_current <- classify_contacts(contacts, followups, on = database_date)
+classification_current %>%
+  count(classification)
+
+classification_current %>%
+  show_table()
+
+```
+
+
+
+
+<!-- ======================================================= -->
 ## Contact classification over time
+
+Case classification includes the following categories, all with respect to a
+given date *d*:
+
+* **`vu`**: seen on day *d*
+* **`non_vu`**: last seen 1 or 2 days before *d*
+* **`perdu_de_vue`**: last seen 3+ days before *d*
+* **`pas_encore_vu`**: will be seen in the future, but have not been seen yet
+* **`jamais_vu_court`**: never seen, for 1-7 days since last exposure
+* **`jamais_vu_long`**: never seen, for 8-21 days since last exposure
+
+We derive contact classification for the 42 days leading up to the current
+database date, i.e. from the  **`r format(database_date - 41, format = "%d %B %Y")`** to the  **`r format(database_date, format = "%d %B %Y")`**..
+
+```{r classification_time}
+
+starting_date <- database_date - 41
+dates <- seq(starting_date, database_date, by = 1L)
+
+classification_all_dates <- lapply(dates,
+                                   function(date)
+                                     classify_contacts(
+                                     contacts,
+                                     followups,
+                                     date))
+
+classification_time <- Reduce(rbind, classification_all_dates)
+classification_time <- classification_time %>%
+  mutate(date =
+           rep(dates, sapply(classification_all_dates, nrow)))
+                               
+    
+ggplot(classification_time, aes(x = date, fill = classification)) +
+  geom_bar() +
+  theme_bw() +
+  scale_classification +
+  large_txt +
+  scale_weeks +
+  theme(legend.position = "bottom") +
+  rotate_x_text(45) +
+  labs(title = "Classification des contacts au cours du temps",
+       x = "",
+       y = "Nombre de contacts par jour")
+
+table_classification_time <- classification_time %>%
+  count(date, classification) %>%
+  spread(classification, n, fill = 0) %>%
+  adorn_totals(c("row", "col"))
+
+table_classification_time%>%
+  show_table()
+
+```
+
+
+
+
+<!-- ======================================================= -->
+## Delays to follow-up
+
+```{r delays_to_followup}
+
+info_seen_dates <- select(classification_time,
+                          id,
+                          first_seen = first_seen_global,
+                          last_seen = last_seen_global)
+
+contacts <- left_join(contacts, info_seen_dates)
+
+contacts <- contacts %>%
+  mutate(delay_to_followup = as.integer(first_seen - date_of_last_contact - 1),
+         followup_duration = as.integer(last_seen - first_seen + 1))
+
+contacts %>%
+  filter(date_of_last_contact >= starting_date) %>% 
+ggplot(aes(x = delay_to_followup)) +
+  geom_bar() +
+  theme_bw() +
+  large_txt +
+  labs(title = "Delais au suivi des contacts (21 derniers jours)",
+       y = "Nombre de contacts",
+       x = "Nombre de jours avant le premier suivi")
+
+## summary of the delay to follow-up
+delay_followup <- contacts$delay_to_followup %>%
+  na.omit() %>%
+  as.integer()
+delay_followup %>%
+  summary()
+
+```
+
+The **average** delay to follow-up is **`r round(mean(delay_followup), 1)`
+days**, with an IQR of **`r round(mean(delay_followup), 1)` days**.
 
 
 
@@ -342,7 +476,7 @@ Click on the following links to open the files (only works if the files above
 have been generated and are in the same folder as this document):
 
 
-```{r links, results = "asis"}
+```{r links, results = "asis", eval = FALSE}
 
 for (e in to_export) {
   txt <- sprintf("- [%s.xlsx](%s.xlsx)",
