@@ -48,11 +48,11 @@ output:
 ## Outline
 
 This report produces basic epicurves by dates of onset or reporting, with
-various stratification, from the cleaned Master linelist database.
+various stratification, from the cleaned Godata database.
 
 ### Data used
 
-This report uses the latest cleaned Master linelist data.
+This report uses the latest cleaned case export from the Godata database.
 
 ### Method
 
@@ -67,10 +67,10 @@ tabs:
 data such as specific data cleaning (not used in other reports), new variables
 used in the analyses, etc.
 
-* **Add new variables**: addition of new variables to the Master linelist database, like top
+* **Add new variables**: addition of new variables to the Godata database, like top
   affected health zones.
 
-* **Filter the data**: keep only relevant confirmed and probable cases, possibly
+* **Filter the data**: Various filters to data possibly
   removing erroneous dates, for further analysis
 
 
@@ -148,14 +148,14 @@ The **completion date** of the database is **`r format(database_date, format =
 <!-- ====================================================== -->
 ## Filter data
 
-In this section we subset the data so that:
+In this section we can subset the data to look at only confirmed and probable cases, for instance. For now we will leave suspect cases in too.
 
-* `cases` contains only confirmed and probable cases
+* `cases` contains confirmed, probable and suspect cases
 
 ```{r filter}
 
 cases <- x %>%
-  filter(classification %in% c("confirmed", "probable"))
+  filter(classification %in% c("confirmed", "probable", "suspect"))
 
 ```
 
@@ -173,9 +173,11 @@ We define custom colors to be used in graphs.
 scale_classification <- scale_fill_manual(
     "",
     values = c(confirmed = "#C83D52",
-               probable = "#D78E99"),
+               probable = "#D78E99",
+               suspect = "#00FFFF"),
     labels = c(confirmed = "Confirmé",
-               probable = "Probable"))
+               probable = "Probable",
+               suspect = "Suspect"))
 
 ```
 
@@ -195,9 +197,10 @@ scale_classification <- scale_fill_manual(
 This section analyses the `cases` database. We derive overall epicurves and
 stratified by:
 
-* confirmed/probable (`classification` variable)
+* confirmed/probable/suspect (`classification` variable)
 
 * health zone (`location_1` variable)
+
 
 
 
@@ -219,7 +222,7 @@ plot(i_report_classification, border = "white") +
         legend.justification = c(-0.05, 1.1),
         legend.background = element_rect(fill = "transparent", 
                                          color = "white")) +
-  labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+  labs(title = paste0("Courbe épidemique: cas confirmés, probables et suspect",
                      "\npar date de début de symptômes à la date de", " ", 
                      format(database_date, "%d/%m/%Y")),
        y = "Nombre de nouveaux cas par semaine") +
@@ -259,7 +262,7 @@ cases %>%
   large_txt +
   facet_grid(top_zones ~ .) +
   theme(legend.position = "bottom") +
-   labs(title = paste0("Courbe épidemique: cas confirmés et probables",
+   labs(title = paste0("Courbe épidemique: cas confirmés, probables et suspect",
                       "\npar semaine de notification, à la date de", " ", 
                       format(database_date, "%d/%m/%Y")),
         y = "Nombre de nouveaux cas par semaine",
@@ -347,9 +350,6 @@ for (e in to_export) {
 The following information documents the system on which the document was
 compiled.
 
-
-
-<!-- ============================================ -->
 ## System 
 
 This provides information on the operating system.
@@ -358,9 +358,6 @@ This provides information on the operating system.
 Sys.info()
 ```
 
-
-
-<!-- ============================================ -->
 ## R environment
 
 This provides information on the version of R used:
@@ -370,8 +367,6 @@ R.version
 ```
 
 
-
-<!-- ============================================ -->
 ## R packages
 
 This provides information on the packages used:
@@ -381,15 +376,23 @@ sessionInfo()
 ```
 
 
+### Change log:
 
+#### Version 2.1.0
 
-<!-- ============================================ -->
-## Compilation parameters
+* added new variable names
+* set color scale for zone de sante across document
+* fixed spelling mistakes
+* changed table and figure names as appropriate ("last 21 days" to "recent onset")
+* added figures and tables for top recent onset ZS, daily for the last 3 months
+* exported new table
 
-The following parameters (`params`) have been used during compilation:
-
-```{r params}
-params
-```
-
-
+### To do: 
+* check use of epiweek_onset_label (lolwa?)
+* rename variables (last_21_days)
+* describe 21 (or other timeframe) days more clearly in text
+* add table and fig for "top ZS recent report" data
+* decide on "recent" timeframe
+* decide on plot timeline in days for daily plots (63 days?)
+* review with Thibaut
+* decide maintainer

@@ -1,7 +1,7 @@
 ## This file is generated automatically by `aaa_clean_linelist`
 ## Do not edit it by hand!
 
-## This file was last updated on the: 2019-11-01 15:29:40
+## This file was last updated on the: 2019-11-01 16:14:49
 
 current_clean_cases <- here::here("data",
                                   "clean",

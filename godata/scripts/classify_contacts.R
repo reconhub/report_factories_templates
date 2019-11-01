@@ -1,5 +1,5 @@
 
-#' Find the status of a contact
+#' Find the status of a contact !!
 #'
 #' This function classifies a contact using a the followup table from
 #' GoData. Classification (in French) includes:
@@ -18,21 +18,21 @@
 #' 
 #' @param on the day on which to assess if the contact is active
 #' 
-
+#' @author Thibaut Jombart and Sara Hollis
 
 classify_contacts <- function(contacts, followups, on) {
 
   ## Overall strategy:
   ##
-  ## 1. on the whole data, find what the first and last days each contact has
+  ## 1. based on the date of last exposure, define active / non_active contacts,
+  ## and keep only active contacts
+  ##
+  ## 2. on the whole data, find what the first and last days each contact has
   ## been seen; if this is NA, this means the contact was truly never seen
   ##
-  ## 2. retain only followup data prior to day of investigation ('on'); some
+  ## 3. retain only followup data prior to day of investigation ('on'); some
   ## individuals may be never seen on the time period retained, but seen later;
   ## these will be the `not_seen_yet` contacts
-  ##
-  ## 3. based on the date of last exposure, define active / non_active contacts,
-  ## and keep only active contacts
   ##
   ## 4. find the last day each contact was seen on the data retained; NAs could
   ## come from contacts that are truly never seen, or who will be seen in the
@@ -40,17 +40,19 @@ classify_contacts <- function(contacts, followups, on) {
   ##
   ## 5. based the delay since last followup, get classifications for all
   ## contacts
-  ##
-  
 
+  
   ## data preparation; `x` will be our working table, each row being a unique
   ## active contact, with columns containing information usefull for the
   ## classification
   
   x <- select(contacts, id, date_of_last_contact)
 
-  
   ## step 1
+  x <- filter(x, active_on(date_of_last_contact, on))
+  
+   
+  ## step 2
   seen_info_global <- followups %>%
     group_by(uid) %>%
     summarise(first_seen_global = min(date_seen, na.rm = TRUE),
@@ -58,12 +60,8 @@ classify_contacts <- function(contacts, followups, on) {
   x <- left_join(x, seen_info_global, by = c("id" = "uid"))
 
   
-  ## step 2
-  followups <- filter(followups, date_of_followup <= on)
-
-
   ## step 3
-  x <- filter(x, active_on(date_of_last_contact, on))
+  followups <- filter(followups, date_of_followup <= on)
 
   
   ## step 4
@@ -98,7 +96,7 @@ classify_contacts <- function(contacts, followups, on) {
                      lost ~ "perdu_de_vue",
                      never_seen_short ~ "jamais_vu_court",
                      never_seen_long ~ "jamais_vu_long",
-                     TRUE ~ "inconnu"
+                     TRUE ~ "inconnu"  ##when last date seen is not there
                  ))
 
   out <- select(x,
