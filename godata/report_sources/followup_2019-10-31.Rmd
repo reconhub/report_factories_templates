@@ -446,7 +446,7 @@ delay_followup %>%
 ```
 
 The **average** delay to follow-up is **`r round(mean(delay_followup), 1)`
-days**, with an IQR of **`r round(mean(delay_followup), 1)` days**.
+days**, with an IQR of **`r round(IQR(delay_followup), 1)` days**.
 
 
 
@@ -483,7 +483,7 @@ duration_followup %>%
 ```
 
 The **average** duration to follow-up is **`r round(mean(duration_followup), 1)`
-days**, with an IQR of **`r round(mean(duration_followup), 1)` days**.
+days**, with an IQR of **`r round(IQR(duration_followup), 1)` days**.
 
 
 
