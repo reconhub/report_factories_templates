@@ -190,7 +190,11 @@ followups <- clean_data(followups, guess_dates = FALSE)
 ## Dates processing
 
 Here we ensure that dates we will be using are indeed dates, and convert them
-where necessary using `guess_dates`.
+where necessary using `guess_dates`. We also make the following changes:
+
+* `date_of_followup_end`: we erase the database version, which seems to have an
+  issue, setting any date in the future compared to the database date to `NA`;
+  this field is now calculated directly from `date_of_last_contact`
 
 ```{r clean_dates}
 
@@ -208,9 +212,9 @@ contacts <- contacts %>%
          date_of_data_entry = guess_dates(created_at),
          date_of_becoming_case = guess_dates(date_of_becoming_case),
          date_of_onset = guess_dates(date_of_onset),
+         date_of_last_contact = guess_dates(date_of_last_contact),
          date_of_followup_start = guess_dates(start_of_the_followup),
-         date_of_followup_end = guess_dates(end_of_the_followup),
-         date_of_last_contact = guess_dates(date_of_last_contact))
+         date_of_followup_end = date_of_last_contact + 21)
 
 relationships <- relationships %>%
   mutate(date_of_data_entry = guess_dates(created_at),
