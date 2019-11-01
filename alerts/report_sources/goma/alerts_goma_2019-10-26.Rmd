@@ -1,6 +1,6 @@
 ---
 title: "Investigation of alerts data: Goma"
-author: "Charlie Whittaker, Thibaut Jombart, Flavio Finger, Christopher Jarvis, Jonathan Polonsky, Patrick Keating, and Amy Gimma for the analytic cell OEC Goma"
+author: "Charlie Whittaker, Christopher Jarvis,  Thibaut Jombart, Flavio Finger, Jonathan Polonsky, Patrick Keating, and Amy Gimma for the analytic cell OEC Goma"
 date: "`r format(Sys.time(), '%A %d %B %Y')`"
 output:
   html_document: 
@@ -30,15 +30,15 @@ knitr::opts_chunk$set(echo = TRUE,
 
 <br>
 
-**Maintainer:** Your Name (your_email@something.com)
+**Maintainer:** Christopher Jarvis (christopher.jarvis@lshtm.ac.uk)
 
-**Code contributors:** Thibaut Jombart, Chris Jarvis
+**Code contributors:** Chris Jarvis, Charlie Whittaker
 
-**Data contributors:** Name of contributors
+**Data contributors:** Surveillance team
 
 **Version:** 1.0.0 
 
-**Reviewed by:** recommended, but only required for routine reports
+**Reviewed by:** Thibaut Jombart
 
 **Notice**: this is a **stable, routine report**. **Do not touch it unless it is
 broken.** To make a contribution, carefully read the
@@ -168,7 +168,6 @@ range(x$date, na.rm = TRUE)
 date_na <- sum(is.na(x$date))
 x <- x %>% filter(!is.na(date))
 # Check that na dates are removed
-sum(is.na(x$date))
 
 ## gender
 table(x$sexe, useNA = "ifany")
@@ -203,10 +202,15 @@ x <- x %>%
 
 ```
 
+
+There are `r length(date_na)` missing dates in the data.
+
+
 <!-- ======================================================= -->
 ## Variable creation
 
 The following variables are created: 
+
 - `bleed` - which describes whether the alert displayed any of the bleeding related
 symptoms.
 - `epiweek_report` & `epiweek_report_label` - which describe the epiweek the alert
@@ -218,19 +222,6 @@ legitimate Aire de Santes belonging to Goma present in the database). Note - All
 other Aire de Santes are aggregated into the category "other".
 
 Note - All other Aire de Santes are aggregated into the category "other".
-
-**Note:** To emphasise, the ranking of top Aire de Santes is done only on those Aire 
-de Santes that legitimately belong to Goma. Those that do not belong to Goma or are
-not Aire de Santes at all, are not included when it comes to plotting the Aire de Santes
-with the most alerts. However, these alerts ARE included when it comes to plotting the
-number of alerts by Sous-Coordination or Zone de Sante (assuming they have a legitimate
-Zone de Sante inputted).
-
-For the purposes of plotting by Aire de Sante, we first have to remove (filter) all 
-instances in the data where individuals have been erroneously assigned to either
-an Aire de Sante that does not belong to Goma, or that is not an Aire de Sante. Once
-this filtering step is done, we then create a new variable using `top_values`:
-
 
 ``` {r variable_creation}
 
@@ -313,11 +304,12 @@ n_rows <- nrow(x)
 unknown_as <- x %>% 
   filter(!aire_de_sante %in% as_names)
 
-most_recent_unknown_as <- max(unknown_as$date, na.rm = T)
+most_recent_unknown_as <- max(unknown_as$date, na.rm = TRUE)
 
 start_date <- database_date - 20
 unknown_as_3weeks <- x %>% 
-  filter(!aire_de_sante %in% as_names & date >= start_date)
+  filter(!aire_de_sante %in% as_names,
+         date >= start_date)
 
 ```
 
@@ -368,7 +360,8 @@ pop_data <- pop_data %>%
 
 ## load the data
 pop_data <- pop_data %>% 
-  filter(aire_de_sante %in% x$aire_de_sante & zone_de_sante %in% x$zone_de_sante)
+  filter(aire_de_sante %in% x$aire_de_sante,
+         zone_de_sante %in% x$zone_de_sante)
 
 pop_data
 
@@ -802,7 +795,7 @@ ggplot(x_recent, aes(x = top_zones, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes",
        title = paste("Nombre d'alertes par statut de validation",
-                      "et \nzone de santé",
+                     "et \nzone de santé",
                      " depuis les 3 semaines dernières")) +
   theme(legend.position = "bottom") +
   large_txt 
@@ -1392,8 +1385,8 @@ table_ha_total_recent_origins %>%
 ```{r health_area_time_recent_origin_recent, fig.width = 12, fig.height = 8}
 
 x_origins_recent <- x %>%
-  filter(top_aires != "other") %>%
-  filter(date > start_date) %>%
+  filter(top_aires != "other",
+         date > start_date) %>%
   count(date, origin, top_aires) 
 
 ggplot(x_origins_recent, aes(x = date, y = n, fill = origin)) +
@@ -1849,8 +1842,8 @@ table_ha_total_recent_decisions %>%
 ```{r health_area_time_recent_decision_recent, fig.width = 12, fig.height = 8}
 
 x_decisions_recent <- outcomes %>%
-  filter(top_aires != "other") %>%
-  filter(date > start_date)
+  filter(top_aires != "other",
+         date > start_date)
 
 ggplot(x_decisions_recent, aes(x = date, fill = decision_comparison)) +
   geom_bar() +
@@ -2022,7 +2015,8 @@ date_span <- database_date - min(x$date, na.rm = TRUE)
 number_weeks <- as.numeric(date_span/7)
 
 x_alert_rate_zone_sante <- x %>%
-  filter(top_zones != "other" & zs_population > 0) %>%
+  filter(top_zones != "other",
+         zs_population > 0) %>%
   count(status, zone_de_sante, zs_population) %>%
   mutate(alert_rate = 10000 * n / (zs_population * number_weeks))
 
@@ -2046,7 +2040,8 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = zone_de_sante,
 ``` {r alert_rate_zone_de_sante_weekly_status, fig.height = 5, fig.width = 10}
 
 x_alert_rate_zone_sante <- x %>%
-  filter(top_zones != "other" & zs_population > 0) %>%
+  filter(top_zones != "other",
+         zs_population > 0) %>%
   count(epiweek_report_label, status, top_zones, zs_population) %>%
   mutate(alert_rate = 10000 * n / zs_population)
 
@@ -2075,9 +2070,9 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = epiweek_report_label,
 ``` {r alert_rate_zone_de_sante_weekly_validation_status_recent}
 
 x_alert_rate_zone_sante <- x %>%
-  filter(date > start_date) %>%
-  filter(as_population > 0) %>%
-  filter(top_zones != "other") %>%
+  filter(date > start_date,
+         as_population > 0,
+         top_zones != "other") %>% 
   count(status, top_zones, zs_population) %>%
   mutate(alert_rate = 10000 * n / (zs_population * 3))
 
@@ -2101,9 +2096,9 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = top_zones,
 ``` {r alert_rate_zone_de_sante_daily_status, fig.height = 5, fig.width = 12}
 
 x_alert_rate_zone_sante <- x %>%
-  filter(date > start_date) %>%
-  filter(zs_population > 0) %>%
-  filter(top_zones != "other") %>%
+  filter(date > start_date,
+         zs_population > 0,
+         top_zones != "other") %>%
   count(date, status, top_zones, zs_population) %>%
   mutate(alert_rate = 10000 * n / zs_population)
 
@@ -2135,8 +2130,8 @@ date_span <- database_date - min(x$date)
 number_weeks <- as.numeric(date_span/7)
 
 x_alert_rate_zone_sante <- x %>%
-  filter(top_zones != "other") %>%
-  filter(as_population > 0) %>%
+  filter(top_zones != "other",
+         as_population > 0) %>%
   count(status, top_zones, aire_de_sante, as_population) %>%
   mutate(alert_rate = 10000 * n / (as_population * number_weeks))
 
@@ -2163,8 +2158,8 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = aire_de_sante,
 ``` {r alert_rate_aire_de_sante_over_time, fig.width = 12, fig.height = 8}
 
 x_alert_rate_aire_sante <- x %>%
-  filter(top_aires != "other") %>%
-  filter(as_population > 0) %>%
+  filter(top_aires != "other",
+         as_population > 0) %>%
   count(epiweek_report_label, status, top_aires, as_population) %>%
   mutate(alert_rate = 10000 * n / as_population) 
 
@@ -2190,9 +2185,9 @@ ggplot(data = x_alert_rate_aire_sante, aes(x = epiweek_report_label,
 ``` {r alert_rate_as_3_weeks, fig.width = 14}
 
 x_alert_rate_aire_sante_recent <- x %>%
-  filter(top_zones != "other") %>%
-  filter(date > start_date) %>%
-  filter(as_population > 0) %>%
+  filter(top_zones != "other",
+         date > start_date,
+         as_population > 0) %>%
   count(status, aire_de_sante, top_zones, as_population) %>%
   mutate(alert_rate = (10000 * n) / (as_population * 3)) 
 
@@ -2219,9 +2214,9 @@ ggplot(data = x_alert_rate_aire_sante_recent, aes(x = aire_de_sante,
 ``` {r alert_rate_aire_de_sante_recent, fig.width = 12, fig.height = 8}
 
 x_alert_rate_aire_sante <- x %>%
-  filter(date > start_date) %>%
-  filter(top_aires != "other") %>%
-  filter(as_population > 0) %>%
+  filter(date > start_date,
+         top_aires != "other",
+         as_population > 0) %>%
   count(date, status, top_aires, as_population) %>%
   mutate(alert_rate = 10000 * n / (as_population)) 
 
@@ -2261,7 +2256,7 @@ working directory.
 
 
 <!-- ======================================================= -->
-## R objects
+## Export clean data
 
 We export some of the clean database, placed in `produced_rds/` as well as in
 `data/clean/`:
@@ -2365,6 +2360,40 @@ for (e in to_export) {
 
 ```
 
+
+We copy the main data file to the `data/clean` folder:
+
+```{r export_xlsx, eval = TRUE}
+
+## create the text for the file name with the database date
+xlsx_file_name <- sprintf("%sclean_%s.xlsx",
+                     undated_file_name(current_goma),
+                     format(database_date, "%Y-%m-%d"))
+xlsx_file_name
+
+## save the rds file in the produced_rds folder
+rio::export(x,
+            file.path("produced_xlsx", xlsx_file_name))
+
+```
+
+
+```{r copy_xlsx, eval = TRUE}
+# copy some files into `data/clean/`
+
+# Provide the destination of where to copy the data
+destination <- here("data",
+                    "clean",
+                    xlsx_file_name)
+# Copy the rds data
+file.copy(from = file.path("produced_xlsx", xlsx_file_name),
+          to = destination,
+          overwrite = TRUE)
+
+```
+
+
+
 Click on the following links to open the files (only works if the files above
 have been generated and are in the same folder as this document):
 
@@ -2398,22 +2427,6 @@ for (e in to_export) {
   rio::export(get(e),
               file.path("produced_rds",
                         paste0(e, ".rds")))
-}
-
-```
-
-Click on the following links to open the files (only works if the files above
-have been generated and are in the same folder as this document):
-
-
-```{r rds_links, results = "asis", eval = TRUE}
-
-for (e in to_export) {
-  txt <- sprintf("- [%s.rds](%s.rds)",
-                 e,
-                 file.path("produced_rds",
-                           e))
-  cat(txt, sep = "\n")
 }
 
 ```
