@@ -222,8 +222,6 @@ followups <- followups %>%
          date_of_onset = guess_dates(dateapparitionsignes),
          date_of_hospitalization = guess_dates(dateadmissioncte),
          date_of_outcome = guess_dates(datededeces))
-         date_of_burial = guess_dates(date_of_burial),
-         date_of_case_notification = guess_dates(date_de_notification_du_cas))
 
 ```
 
