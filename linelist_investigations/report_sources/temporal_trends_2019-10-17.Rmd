@@ -1565,6 +1565,7 @@ ggplot(nosocomial_deaths_top_zones, aes(x = top_zones, y = p)) +
   geom_point(color = color_nosocomial_death, size = 2) +
   geom_label(aes(y = p_upper + 10, label = paste0("n=", denom))) +
   large_txt +
+  rotate_x_text(45) +
   coord_flip() +
   scale_y_continuous(breaks = seq(0, 100, by = 20),
                      limit = c(0, 110)) +
