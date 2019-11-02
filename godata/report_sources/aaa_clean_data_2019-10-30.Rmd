@@ -64,8 +64,8 @@ tabs:
 data such as specific data cleaning (not used in other reports), new variables
 used in the analyses, etc.
 
-* **Add new variables**: addition of new variables to the Master linelist
-  database, like top affected health zones.
+* **Add new variables**: addition of new variables to the case and contact lists;
+importantly adding hierarchy levels that are missing in initial case and contact lists
 
 * **Filter the data**: keep only relevant confirmed and probable cases, possibly
   removing erroneous dates, for further analysis
@@ -116,6 +116,10 @@ We extract the completion date from the file names, for:
 
 4. contact follow up data
 
+And also add:
+
+5. godata hierarchy
+
 
 ```{r load_data}
 
@@ -139,6 +143,11 @@ relationships <- custom_import(relationships_file) %>%
 ## step 4
 followups_file
 followups <- custom_import(followups_file) %>%
+  as_tibble()
+
+## step 5
+hierarchy_file
+hierarchy <- custom_import(hierarchy_file) %>%
   as_tibble()
 
 ```
@@ -180,6 +189,7 @@ cases <- clean_data(cases, guess_dates = FALSE)
 contacts <- clean_data(contacts, guess_dates = FALSE)
 relationships <- clean_data(relationships, guess_dates = FALSE)
 followups <- clean_data(followups, guess_dates = FALSE)
+hierarchy <- clean_data(hierarchy)
 
 ```
   
@@ -264,6 +274,24 @@ In the following we add variables to the datasets:
     * `epiweek_report_label`: the epiweek for the date of reporting
     * `epiweek_report` the first day of the epiweek for the date of reporting
     * `age_class`
+    * `province`
+    * `zone_de_sante`
+    * `aire_de_sante`
+    * `quartier`
+    * `cellule`
+    * `reco`
+    
+* `contacts`
+    + `top_zones`: the 5 health zones having reported most cases over the last
+      42 days
+    * `age_class`
+    * `province`
+    * `zone_de_sante`
+    * `aire_de_sante`
+    * `quartier`
+    * `cellule`
+    * `reco`
+
 * `followups`
     + `uid`: unique identifier for matching in `contacts$id` (long form)
 
@@ -272,42 +300,52 @@ In the following we add variables to the datasets:
 recent_date <- database_date - 42
 recent_cases <- cases$date_of_reporting >= recent_date
  
-cases <- cases %>%
-  mutate(top_zones = top_values(location_1, 5, subset = recent_cases),
-         epiweek_report_label = aweek::date2week(date_of_reporting,
-                                                 week_start = "Monday", 
-                                                 floor_day = TRUE),
-         epiweek_report = aweek::week2date(epiweek_report_label,
-                                           week_start = "Monday")) %>%
-  mutate(
-      age = as.numeric(age_years),
-      age_class = factor(
-          case_when(
-              age <= 5 ~ "<=5",
-              age <= 10 ~ "6-10",
-              age <= 17 ~ "11-17",
-              age <= 25 ~ "18-25",
-              age <= 35 ~ "26-35",
-              age <= 45 ~ "36-45",
-              age <= 55 ~ "46-55",
-              age <= 65 ~ "56-65",
-              is.finite(age) ~ "66+",
-              TRUE ~ "unknown"
-          ), levels = c(
-                 "<=5",
-                 "6-10",
-                 "11-17",
-                 "18-25",
-                 "26-35",
-                 "36-45",
-                 "46-55",
-                 "56-65",
-                 "66+",
-                 "unknown"
-             )),
-      age_class_plot = factor(
-          age_class,
-          levels = rev(levels(age_class))))
+cases %>%
+mutate(top_zones = top_values(location_1, 5, subset = recent_cases),
+       epiweek_report_label = aweek::date2week(date_of_reporting,
+                                               week_start = "Monday",
+                                               floor_day = TRUE),
+       epiweek_report = aweek::week2date(epiweek_report_label,
+                                         week_start = "Monday")) %>%
+mutate(
+    age = as.numeric(age_years),
+    age_class = factor(
+        case_when(
+            age <= 5 ~ "<=5",
+            age <= 10 ~ "6-10",
+            age <= 17 ~ "11-17",
+            age <= 25 ~ "18-25",
+            age <= 35 ~ "26-35",
+            age <= 45 ~ "36-45",
+            age <= 55 ~ "46-55",
+            age <= 65 ~ "56-65",
+            is.finite(age) ~ "66+",
+            TRUE ~ "unknown"
+        ), levels = c(
+               "<=5",
+               "6-10",
+               "11-17",
+               "18-25",
+               "26-35",
+               "36-45",
+               "46-55",
+               "56-65",
+               "66+",
+               "unknown"
+           )),
+    age_class_plot = factor(
+        age_class,
+        levels = rev(levels(age_class))))
+  
+
+  hierarchy_join <- select(hierarchy, starts_with("name"))
+  x1 <- left_join(contacts, hierarchy_join, by = c("location_1" = "name_6"))
+  x1$name_6[!is.na(x1$name_5)] <- x1$location_1[!is.na(x1$name_5)]
+  # repeat but with filters to acheve the rest
+  
+
+)
+  
 
 
 followups <- followups %>%
