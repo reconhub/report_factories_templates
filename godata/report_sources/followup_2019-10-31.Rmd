@@ -147,6 +147,32 @@ The **completion date** of the database is **`r format(database_date, format =
 
 
 
+
+<!-- ====================================================== -->
+## Filter by sub-coordination
+
+This part is only used if set up through `params$sc` during compilation time,
+when calling `compile_report` or `update_reports`. Only sub-coordinations
+matching the character vector `params$sc` will be retained for further
+analysis. If `params$sc` is `NULL`, it will be ignored and all data will be
+retained.
+
+
+```{r subset_sc}
+
+if (!is.null(params$sc)) {
+  contacts <- contacts %>%
+    filter(sub_coordination %in% params$sc)
+
+  followups <- followups %>%
+    filter(sub_coordination %in% params$sc)
+}
+
+```
+
+
+
+
 <!-- ====================================================== -->
 ## Quality controls
 
