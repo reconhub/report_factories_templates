@@ -8,3 +8,8 @@ relationships_file <- get_latest_data("relationships", raw_folder)
 
 contacts_file <- get_latest_data("contacts", raw_folder)
 
+followups_file <- get_latest_data("followups", raw_folder)
+
+
+
+
