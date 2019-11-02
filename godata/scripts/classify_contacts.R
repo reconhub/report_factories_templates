@@ -5,10 +5,13 @@
 #' GoData. Classification (in French) includes:
 #'
 #' * `inactif`: outside the active period (before or after)
+#' * `jamais_vu`: never seen so far
 #' * `jamais_vu_court`: never seen so far, for 1-7 days
 #' * `jamais_vu_long`: never seen so far, for 8+ days
 #' * `vu`: seen on the considered day
 #' * `non_vu`: not seen for 1-2 days
+#' * `non_vu_1_jour`: not seen for 1 day
+#' * `non_vu_2_jour`: not seen for 2 days
 #' * `perdu_de_vue`: not seen for 3+ days
 #' * `pas_encore_vu`: will be seen at some point, but never seen until now
 #'
@@ -93,7 +96,10 @@ classify_contacts <- function(contacts, followups, on) {
                      not_seen_yet ~ "pas_encore_vu",
                      seen ~ "vu",
                      not_seen ~ "non_vu",
+                     not_seen_1_day ~ "non_vu_1_jour",
+                     not_seen_2_day ~ "non_vu_2_jour",
                      lost ~ "perdu_de_vue",
+                     never_seen ~ "jamais_vu",
                      never_seen_short ~ "jamais_vu_court",
                      never_seen_long ~ "jamais_vu_long",
                      TRUE ~ "inconnu"  ##when last date seen is not there

@@ -165,6 +165,29 @@ table_missing_contacts %>%
   show_table()
 ```
 
+* check that status of visit in `followups` is documented correctly via both 
+`status` and `statutdevisite` fields; those who are not are output to a table
+and should be fixed
+  
+```{r quality_controls}
+
+table_inconsistent_status <- followups %>%
+  filter(!(
+    (status == "not_performed" & is.na(statutdevisite)) |
+    (status == "seen_no_signs" & statutdevisite == "vu_sans_signe") |
+    (status == "seen_with_signs" & statutdevisite == "vu_avec_signe") |
+    (status == "decede" & statutdevisite == "decede") |
+    (status == "not_seen" & statutdevisite == "nonvu") 
+          ))
+ 
+table_inconsistent_status %>%
+  select(contact_id,team,location,status,statutdevisite) %>%
+  show_table()
+```
+
+
+
+
 
 
 ## Adding variables
