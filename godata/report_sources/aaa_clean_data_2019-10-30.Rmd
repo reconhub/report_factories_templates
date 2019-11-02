@@ -1,6 +1,6 @@
 ---
 title: "GoData: let's go clean"
-author: "Thibaut Jombart and Sara Hollis"
+author: "Thibaut Jombart, Sara Hollis, Christopher Jarvis"
 date: "`r format(Sys.time(), '%A %d %B %Y')`"
 output:
   html_document:
@@ -26,7 +26,7 @@ output:
   
   **Maintainer:** Thibaut Jombart (thibautjombart@gmail.com)
   
-  **Code contributors:** Thibaut Jombart, Sara Hollis
+  **Code contributors:** Thibaut Jombart, Sara Hollis, Christopher Jarvis
   
   **Data contributors:** GoData team Beni
     
@@ -189,7 +189,7 @@ cases <- clean_data(cases, guess_dates = FALSE)
 contacts <- clean_data(contacts, guess_dates = FALSE)
 relationships <- clean_data(relationships, guess_dates = FALSE)
 followups <- clean_data(followups, guess_dates = FALSE)
-hierarchy <- clean_data(hierarchy)
+hierarchy <- clean_data(hierarchy, guess_dates = FALSE)
 
 ```
   
@@ -262,6 +262,151 @@ contacts <- contacts %>%
 ```
 
 
+<!-- ====================================================== -->
+## Adding locations
+
+Unfortunately at present as of 2019-11-02 the locations are in a graphical database and only the lowest level of location is stored in the contacts data. 
+
+In order to merge on the location data at multiple levels we need to do multiple join and filter the data. 
+
+Process
+
+- get the id and location in a data frame. 
+- join on an lowest area
+- add that area to the data
+- filter the data to keep
+- filter the data for the next area
+- repeat
+
+
+```{r filter_by_locations}
+
+hierarchy_join <- select(hierarchy, starts_with("name"))
+x_join <- contacts %>% select(id, location_1)
+  
+
+
+### Name 6
+# Join on name_6 area
+n_6 <- left_join(x_join, hierarchy_join, by = c("location_1" = "name_6"))
+# create name_6 variable as it doesn't stay after merge
+n_6$name_6 <- NA
+# Fill in name_6 for non-missing
+n_6$name_6[!is.na(n_6$name_5)] <- n_6$location_1[!is.na(n_6$name_5)]
+
+# Keep the name_6 for later
+n_6_keep <- n_6 %>% 
+  filter(!is.na(n_6$name_5)) %>% 
+  select(id, location_1, name_0, name_1, name_2, name_3, name_4, name_5, name_6)
+ 
+### Name 5
+n_5 <- n_6 %>% 
+  filter(is.na(n_6$name_5)) %>% 
+  select(id, location_1)
+
+n_5 <- n_5 %>% 
+  left_join(hierarchy_join, by = c("location_1" = "name_5"))
+  
+n_5$name_5 <- NA
+n_5$name_5[!is.na(n_5$name_4)] <- n_5$location_1[!is.na(n_5$name_4)]
+
+n_5_keep <- n_5 %>% 
+  filter(!is.na(n_5$name_4)) %>% 
+  select(id, location_1, name_0, name_1, name_2, name_3, name_4, name_5, name_6)
+
+### Name 4
+n_4 <- n_5 %>% 
+  filter(is.na(n_5$name_4)) %>% 
+  select(id, location_1)
+
+n_4 <- n_4 %>% 
+  left_join(hierarchy_join, by = c("location_1" = "name_4"))
+  
+n_4$name_4 <- NA
+n_4$name_4[!is.na(n_4$name_3)] <- n_4$location_1[!is.na(n_4$name_3)]
+
+n_4_keep <- n_4 %>% 
+  filter(!is.na(n_4$name_3)) %>% 
+  select(id, location_1, name_0, name_1, name_2, name_3, name_4, name_5, name_6)
+  
+### Name 3
+n_3 <- n_4 %>% 
+  filter(is.na(n_4$name_3)) %>% 
+  select(id, location_1)
+
+n_3 <- n_3 %>% 
+  left_join(hierarchy_join, by = c("location_1" = "name_3"))
+  
+n_3$name_3 <- NA
+n_3$name_3[!is.na(n_3$name_2)] <- n_3$location_1[!is.na(n_3$name_2)]
+
+n_3_keep <- n_3 %>% 
+  filter(!is.na(n_3$name_2)) %>% 
+  select(id, location_1, name_0, name_1, name_2, name_3, name_4, name_5, name_6)
+
+### Name 2
+n_2 <- n_3 %>% 
+  filter(is.na(n_3$name_2)) %>% 
+  select(id, location_1)
+
+n_2 <- n_2 %>% 
+  left_join(hierarchy_join, by = c("location_1" = "name_2"))
+  
+n_2$name_2 <- NA
+n_2$name_2[!is.na(n_2$name_1)] <- n_2$location_1[!is.na(n_2$name_1)]
+  
+n_2_keep <- n_2 %>% 
+  filter(!is.na(n_2$name_1)) %>% 
+  select(id, location_1, name_0, name_1, name_2, name_3, name_4, name_5, name_6)
+
+
+### Name 1
+n_1 <- n_2 %>% 
+  filter(is.na(n_2$name_1)) %>% 
+  select(id, location_1)
+
+n_1 <- n_1 %>% 
+  left_join(hierarchy_join, by = c("location_1" = "name_1"))
+  
+
+n_1$name_1 <-  NA
+n_1$name_1[!is.na(n_1$name_0)] <- n_1$location_1[!is.na(n_1$name_0)]
+
+n_1_keep <- n_1 %>% 
+  filter(!is.na(n_1$name_0)) %>% 
+  select(id, location_1, name_0, name_1, name_2, name_3, name_4, name_5, name_6)
+
+### Name 0
+
+n_0_keep <- n_1 %>% 
+  filter(is.na(n_1$name_0)) %>% 
+  select(id, location_1, name_0, name_1, name_2, name_3, name_4, name_5, name_6)
+
+n_all <- rbind(n_6_keep,
+               n_5_keep,
+               n_4_keep,
+               n_3_keep,
+               n_2_keep,
+               n_1_keep,
+               n_0_keep)
+
+
+```
+
+Now we can add on the locations to the main contacts data. 
+
+```{r merge_location}
+
+contacts <- left_join(contacts, n_all)
+
+
+head(contacts)
+
+```
+
+
+
+
 
 <!-- ====================================================== -->
 ## Adding new variables
@@ -298,16 +443,16 @@ In the following we add variables to the datasets:
 ```{r new_variables}
 
 recent_date <- database_date - 42
-recent_cases <- cases$date_of_reporting >= recent_date
+recent_cases <- cases$date_of_reporting > recent_date
  
 cases %>%
-mutate(top_zones = top_values(location_1, 5, subset = recent_cases),
+  mutate(top_zones = top_values(location_1, 5, subset = recent_cases),
        epiweek_report_label = aweek::date2week(date_of_reporting,
                                                week_start = "Monday",
                                                floor_day = TRUE),
        epiweek_report = aweek::week2date(epiweek_report_label,
                                          week_start = "Monday")) %>%
-mutate(
+  mutate(
     age = as.numeric(age_years),
     age_class = factor(
         case_when(
@@ -337,21 +482,9 @@ mutate(
         age_class,
         levels = rev(levels(age_class))))
   
-
-  hierarchy_join <- select(hierarchy, starts_with("name"))
-  x1 <- left_join(contacts, hierarchy_join, by = c("location_1" = "name_6"))
-  x1$name_6[!is.na(x1$name_5)] <- x1$location_1[!is.na(x1$name_5)]
-  # repeat but with filters to acheve the rest
-  
-
-)
-  
-
-
-followups <- followups %>%
-  mutate(uid = lng_follow_up_field_label_contact_id)
-
 ```
+
+
 
 
 
