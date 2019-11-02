@@ -46,12 +46,13 @@ output:
 
 ## Outline
 
-This report produces basic epicurves by dates of onset or reporting, with
-various stratification, from the cleaned Master linelist database.
+This report produces information about contract tracing from daily followup 
+reports submitted by contract tracers.
 
 ### Data used
 
-This report uses the latest cleaned Master linelist data.
+This report uses the latest export of followup reports and contact lists from
+the Godata database.
 
 ### Method
 
@@ -66,11 +67,11 @@ tabs:
 data such as specific data cleaning (not used in other reports), new variables
 used in the analyses, etc.
 
-* **Add new variables**: addition of new variables to the Master linelist database, like top
-  affected health zones.
+* **Add new variables**: addition of new variables to the followups, like status 
+of contact tracing (non vue, jamais vue, etc.)
 
-* **Filter the data**: keep only relevant confirmed and probable cases, possibly
-  removing erroneous dates, for further analysis
+* **Filter the data**: ability to subset the followup lists to see only relevant 
+records for analysis
 
 
 
@@ -145,8 +146,6 @@ The **completion date** of the database is **`r format(database_date, format =
 "%A %d %b %Y")`**.
 
 
-
-
 <!-- ====================================================== -->
 ## Quality controls
 
@@ -161,10 +160,10 @@ table_missing_contacts <- followups %>%
   filter(!(lng_follow_up_field_label_contact_id %in% contacts$id))
 
 table_missing_contacts %>%
+  select(contact_id,team,location,created_at) %>%
+  arrange(desc(contact_id)) %>%
   show_table()
-
 ```
-
 
 
 
@@ -259,14 +258,20 @@ scale_classification <- scale_fill_manual(
     values = c(inconnu = "#8c8c8c",
                vu = "#79d2a6",
                non_vu = "#9494b8",
+               non_vu_1_jour = "",
+               non_vu_2_jour = "",
                perdu_de_vue = "#ff9966",
+               jamais_vu = "",
                jamais_vu_court = "#ff6666",
                jamais_vu_long = "#b30000",
                pas_encore_vu = "#5E9281"),
     labels = c(inconnu = "Inconnu",
                vu = "Vu",
                non_vu = "Non vu",
+               non_vu_1_jour = "Non vu pour 1 jour",
+               non_vu_2_jour = "Non vu pour 2 jour",
                perdu_de_vue = "Perdu de vue",
+               jamais_vu = "Jamais vu",
                jamais_vu_court = "Jamais vu (court)",
                jamais_vu_long = "Jamais vu (long)",
                pas_encore_vu = "Pas encore vu"))
@@ -348,8 +353,11 @@ given date *d*:
 
 * **`vu`**: seen on day *d*
 * **`non_vu`**: last seen 1 or 2 days before *d*
+* **`non_vu_1_jour`**: last seen 1 before *d*
+* **`non_vu_2_jour`**: last seen 2 days before *d*
 * **`perdu_de_vue`**: last seen 3+ days before *d*
 * **`pas_encore_vu`**: will be seen in the future, but have not been seen yet
+* **`jamais_vu`**: never seen
 * **`jamais_vu_court`**: never seen, for 1-7 days since last exposure
 * **`jamais_vu_long`**: never seen, for 8-21 days since last exposure
 
