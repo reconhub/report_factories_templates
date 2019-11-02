@@ -1885,8 +1885,6 @@ are `r length(non_pop_data)` Aire de Santes without population data, which total
 if(allNA(x$as_population)){
   knitr::opts_chunk$set(eval = FALSE)
   no_pop_data <- TRUE
-  
-} else{
   cat("There is no population data therefore alert rates can not be calculated.")
 }
 
