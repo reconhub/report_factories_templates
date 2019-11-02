@@ -1,6 +1,6 @@
 ---
 title: "Incidence by aire de santé"
-author: "Madeleine Crowe, Flavio Finger, Thibaut Jombart, and Jonathan Polonsky for the epi analytic cell North Kivu"
+author: "Flavio Finger, Madeleine Crowe,Thibaut Jombart, and Jonathan Polonsky for the epi analytic cell North Kivu"
 date: "`r format(Sys.time(), '%A %d %B %Y')`"
 output:
   html_document:
@@ -16,6 +16,27 @@ output:
 editor_options: 
   chunk_output_type: console
 ---
+
+
+<br>
+
+<div class="report_meta">
+  <span class="notice">**Notice**: this is a **stable, routine report**. 
+  **Do not touch it unless it is broken.** To make a contribution, **carefully read 
+  the [README](../../../../../README.html) file**.</span>
+  
+  **Maintainer:** Flavio Finger (flavio.finger@gmail.com)
+  
+  **Code contributors:** Flavio Finger, Madeleine Crowe,Thibaut Jombart, and Jonathan Polonsky
+  
+  **Data contributors:** Yannick Tutu, Richy Ngombo
+  
+  **Version:** 2.1.0
+  
+  **Reviewed by:** Thibaut Jombart
+</div>
+
+
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE,
