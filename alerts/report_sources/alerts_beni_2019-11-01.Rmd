@@ -925,7 +925,7 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes",
        title = "Nombre d'alertes par statut de validation et aire de santé",
-       subtitle = "avec moins que 100 alertes") +
+       subtitle = "avec moins de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1037,7 +1037,7 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
        y = "Nombre d'alertes",
        title = paste("Nombre d'alertes par statut de validation et aire de santé",
                      " depuis les 3 semaines dernières"),
-        subtitle = "avec plus de 20 alertes") +
+        subtitle = "avec moins de 20 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1379,7 +1379,7 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
   labs(x = "",
        y = "Nombre d'alertes",
        title = "Nombre d'alertes par origine et aire de santé",
-       subtitle = "avec moins que 100 alertes") +
+       subtitle = "avec moins de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1490,7 +1490,7 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
        y = "Nombre d'alertes",
        title = paste("Nombre d'alertes par origine et aire de santé",
                      "\ndepuis les 3 semaines dernières"),
-       subtitle = "avec moins que 20 alertes") +
+       subtitle = "avec moins de 20 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1885,7 +1885,7 @@ ggplot(x_decisions,
   labs(x = "",
        y = "Nombre d'alertes",
        title = "Nombre d'alertes par décision de validation et aire de santé",
-       subtitle = "avec moins que 100 alertes") +
+       subtitle = "avec moins de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1998,7 +1998,7 @@ ggplot(x_decisions,
        y = "Nombre d'alertes",
        title = paste("Nombre d'alertes par décision de validation et aire de santé",
                      "\ndepuis les 3 semaines dernières"),
-       subtitle = "avec plus de 20 alertes") +
+       subtitle = "avec moins de 20 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -2524,6 +2524,11 @@ to_export <- c("cleaned_alerts_database_beni",
 ```
 
 ```{r xlsx_exports, eval = TRUE}
+
+## check if a directory exists and if not then creates it
+if (!dir.exists("produced_xlsx")) {
+  dir.create("produced_xlsx")
+}
 
 for (e in to_export) {
   rio::export(get(e),
