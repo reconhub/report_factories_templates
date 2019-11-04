@@ -975,7 +975,7 @@ table_ha_over_time_validation %>%
 
 Graphs are split by greater or less than 20 alerts removed all are kept in table 
 
-``` {r health_area_total_recent_greater20, fig.width = 14}
+```{r health_area_total_recent_greater20, fig.width = 14}
 
 x_validations <- x_recent %>%
   filter(date > start_date) %>%
@@ -1003,7 +1003,7 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
 ```
 
 
-``` {r health_area_total_recent_less20, fig.width = 14}
+```{r health_area_total_recent_less20, fig.width = 14}
 
 x_validations <- x_recent %>%
   filter(date > start_date) %>%
@@ -1321,7 +1321,7 @@ table_hz_over_time_recent_origins %>%
 
 Graphs are split by greater or less than 100 alerts removed all are kept in table. 
 
-``` {r health_area_total_origins_greter100, fig.width = 14}
+```{r health_area_total_origins_greter100, fig.width = 14}
 
 x_origins <- x %>%
   count(origin, zone_de_sante, aire_de_sante) %>%
@@ -1347,7 +1347,7 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
 ```
 
 
-``` {r health_area_total_origins_less100, fig.width = 14}
+```{r health_area_total_origins_less100, fig.width = 14}
 
 x_origins <- x %>%
   count(origin, zone_de_sante, aire_de_sante) %>%
@@ -1830,7 +1830,7 @@ table_hz_over_time_recent_decisions %>%
 
 Graphs are split by greater or less than 100 alerts removed all are kept in table. 
 
-``` {r health_area_total_decisionsgreater100, fig.width = 14}
+```{r health_area_total_decisionsgreater100, fig.width = 14}
 
 x_decisions <- outcomes %>%
   count(decision_comparison, zone_de_sante, aire_de_sante) %>%
@@ -1939,7 +1939,7 @@ table_ha_over_time_decisions %>%
 
 Graphs are split by greater or less than 20 alerts removed all are kept in table.  
 
-``` {r health_area_total_recent_decision_greater20, fig.width = 14}
+```{r health_area_total_recent_decision_greater20, fig.width = 14}
 
 x_decisions <- outcomes_recent %>%
   filter(date > start_date) %>%
@@ -1966,7 +1966,7 @@ ggplot(x_decisions,
 
 ```
 
-``` {r health_area_total_recent_decision_less20, fig.width = 14}
+```{r health_area_total_recent_decision_less20, fig.width = 14}
 
 x_decisions <- outcomes_recent %>%
   filter(date > start_date) %>%
