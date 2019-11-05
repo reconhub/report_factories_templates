@@ -543,6 +543,41 @@ outcomes_recent <- filter(outcomes, date >= start_date)
 
 ```
 
+
+<!-- ======================================================= -->
+## Alerts counts split
+
+Calculate number of alerts greater than or equal to 100 or less than 100 over all time. Greater than or less than 20 for recent. There are many aire de santes and this helps to restrict what can be seen. 
+
+```{r alert_count_split}
+
+greater_100 <- x %>% count(zone_de_sante,
+               aire_de_sante) %>% 
+  filter(n >= 100) %>% 
+  pull(aire_de_sante)
+
+less_100 <- x %>% count(zone_de_sante,
+               aire_de_sante) %>% 
+  filter(n < 100) %>% 
+  pull(aire_de_sante)
+
+less_100[less_100 %in% greater_100] <- NA
+less_100 <- less_100[complete.cases(less_100)]
+
+greater_20_recent <- x_recent %>% count(zone_de_sante,
+               aire_de_sante) %>% 
+  filter(n >= 20) %>% 
+  pull(aire_de_sante)
+less_20_recent <- x_recent %>% count(zone_de_sante,
+               aire_de_sante) %>% 
+  filter(n < 20) %>% 
+  pull(aire_de_sante)
+
+less_20_recent[less_20_recent %in% greater_20_recent] <- NA
+less_20_recent <- less_20_recent[complete.cases(less_20_recent)]
+  
+```
+
 <!-- ======================================================= -->
 ## Custom color scales
 
@@ -582,10 +617,6 @@ scale_validations <- scale_fill_manual(
 
 ```
 
-
-<!-- ======================================================= -->
-<!-- ======================================================= -->
-<!-- ======================================================= -->
 
 # Validation status {.tabset .tabset-fade .tabset-pills}
 
@@ -840,13 +871,37 @@ table_hz_over_time_recent_validation %>%
 
 ### Total since database start
 
-Areas with less than 100 alerts removed from graph but kept in table. 
+Graphs are split by greater or less than 100 alerts removed all are kept in table 
 
-```{r health_area_total, fig.width = 14}
+```{r health_area_total_greater100, fig.width = 14}
 
 x_validations <- x %>%
   count(status, zone_de_sante, aire_de_sante) %>%
-  filter(n >= 100)
+  filter(aire_de_sante %in% greater_100)
+
+ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
+  geom_col() +
+  scale_x_discrete(drop = TRUE) +
+  scale_validations +
+  facet_grid(. ~ zone_de_sante, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes",
+       title = "Nombre d'alertes par statut de validation et aire de santé",
+       subtitle = "avec plus de 100 alertes") +
+  theme(legend.position = "bottom") +
+  large_txt +
+  rotate_x_text(45)
+
+
+```
+
+```{r health_area_total_less100, fig.width = 14}
+
+x_validations <- x %>%
+  count(status, zone_de_sante, aire_de_sante) %>%
+  filter(aire_de_sante %in% less_100)
 
 ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
   geom_col() +
@@ -858,7 +913,7 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes",
        title = "Nombre d'alertes par statut de validation et aire de santé",
-       subtitle = "avec plus de 100 alertes") +
+       subtitle = "avec moins de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -920,14 +975,14 @@ table_ha_over_time_validation %>%
 
 ### Total past 3 weeks
 
-Areas with less than 20 alerts removed from graph but kept in table. 
+Graphs are split by greater or less than 20 alerts removed all are kept in table 
 
-``` {r health_area_total_recent, fig.width = 14}
+```{r health_area_total_recent_greater20, fig.width = 14}
 
-x_validations <- x %>%
+x_validations <- x_recent %>%
   filter(date > start_date) %>%
   count(status, zone_de_sante, aire_de_sante) %>%
-  filter(n >= 20)
+  filter(aire_de_sante %in% greater_20_recent)  
 
 
 ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
@@ -950,12 +1005,39 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
 ```
 
 
+```{r health_area_total_recent_less20, fig.width = 14}
+
+x_validations <- x_recent %>%
+  filter(date > start_date) %>%
+  count(status, zone_de_sante, aire_de_sante) %>%
+  filter(aire_de_sante %in% less_20_recent)
+
+
+ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
+  geom_col() +
+  scale_x_discrete(drop = FALSE) +
+  scale_validations +
+  facet_grid(. ~ zone_de_sante, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes",
+       title = paste("Nombre d'alertes par statut de validation et aire de santé",
+                     " depuis les 3 semaines dernières"),
+        subtitle = "avec moins de 20 alertes") +
+  theme(legend.position = "bottom") +
+  large_txt +
+  rotate_x_text(45)
+
+
+```
+
+
 ### Table - total past 3 weeks 
 
 ```{r table_ha_total_recent_validation, fig.keep = "all"}
 
-table_ha_total_recent_validation <- x %>%
-  filter(date > start_date) %>%
+table_ha_total_recent_validation <- x_recent %>%
   count(aire_de_sante, status) %>%
   spread(status, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
@@ -994,8 +1076,7 @@ ggplot(x_validations, aes(x = date, y = n, fill = status)) +
 
 ```{r table_ha_over_time_recent_validation , fig.width = 12, fig.height = 5}
 
-table_ha_over_time_recent_validation <- x %>%
-  filter(date > start_date) %>%
+table_ha_over_time_recent_validation <- x_recent %>%
   count(date, top_aires, status) %>%
   spread(status, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
@@ -1210,7 +1291,7 @@ ggplot(x_recent, aes(x = date, fill = origin)) +
   scale_origins + 
   labs(x = "",
        y = "Nombre d'alertes par jour",
-       title = paste0("Nombre d'alertes par origine de validation ",
+       title = paste0("Nombre d'alertes par origine",
                       "et zone de sante - Goma")) +
   large_txt +
   rotate_x_text(45) +
@@ -1238,13 +1319,13 @@ table_hz_over_time_recent_origins %>%
 
 ### Total since database start
 
-Areas with less than 100 alerts removed from graph but kept in table. 
+Graphs are split by greater or less than 100 alerts removed all are kept in table. 
 
-``` {r health_area_total_origins, fig.width = 14}
+```{r health_area_total_origins_greter100, fig.width = 14}
 
 x_origins <- x %>%
   count(origin, zone_de_sante, aire_de_sante) %>%
-  filter(n >= 100) 
+  filter(aire_de_sante %in% greater_100) 
 
 
 ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
@@ -1256,8 +1337,34 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par statut de validation et aire de santé",
+       title = "Nombre d'alertes par origine et aire de santé",
        subtitle = "avec plus de 100 alertes") +
+  theme(legend.position = "bottom") +
+  large_txt +
+  rotate_x_text(45)
+
+
+```
+
+
+```{r health_area_total_origins_less100, fig.width = 14}
+
+x_origins <- x %>%
+  count(origin, zone_de_sante, aire_de_sante) %>%
+  filter(aire_de_sante %in% less_100)
+
+
+ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
+  geom_col() +
+  scale_x_discrete(drop = FALSE) +
+  scale_origins +
+  facet_grid(. ~ zone_de_sante, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes",
+       title = "Nombre d'alertes par origine et aire de santé",
+       subtitle = "avec moins de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1293,7 +1400,7 @@ ggplot(x_origins, aes(x = epiweek_report_label, fill = origin)) +
   scale_origins + 
   labs(x = "",
        y = "Nombre d'alertes par semaine",
-       title = paste0("Nombre d'alertes par statut de validation",
+       title = paste0("Nombre d'alertes par origine",
                       " et zone de sante - Goma")) +
   large_txt +
   rotate_x_text(45) +
@@ -1322,14 +1429,14 @@ table_ha_over_time_origins %>%
 
 ### Total past 3 weeks
 
-Areas with less than 20 alerts removed from graph but kept in table. 
+Graphs are split by greater or less than 20 alerts removed all are kept in table. 
 
-``` {r health_area_total_recent_origin, fig.width = 14}
+``` {r health_area_total_recent_origin_greater20, fig.width = 14}
 
-x_origins <- x %>%
+x_origins <- x_recent %>%
   filter(date > start_date) %>%
   count(origin, zone_de_sante, aire_de_sante) %>%
-  filter(n >= 20)
+  filter(aire_de_sante %in% greater_20_recent)
 
 ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
   geom_col() +
@@ -1340,9 +1447,36 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = paste("Nombre d'alertes par statut de validation et aire de santé",
+       title = paste("Nombre d'alertes par origine et aire de santé",
                      "\ndepuis les 3 semaines dernières"),
        subtitle = "avec plus de 20 alertes") +
+  theme(legend.position = "bottom") +
+  large_txt +
+  rotate_x_text(45)
+
+
+```
+
+
+``` {r health_area_total_recent_origin_less20, fig.width = 14}
+
+x_origins <- x_recent %>%
+  filter(date > start_date) %>%
+  count(origin, zone_de_sante, aire_de_sante) %>%
+  filter(aire_de_sante %in% less_20_recent)  
+
+ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
+  geom_col() +
+  scale_x_discrete(drop = FALSE) +
+  scale_origins +
+  facet_grid(. ~ zone_de_sante, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes",
+       title = paste("Nombre d'alertes par origine et aire de santé",
+                     "\ndepuis les 3 semaines dernières"),
+       subtitle = "avec moins de 20 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1355,7 +1489,7 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
 
 ```{r table_ha_total_recent_origins, fig.keep = "all"}
 
-table_ha_total_recent_origins <- x %>%
+table_ha_total_recent_origins <- x_recent %>%
   count(aire_de_sante, origin) %>%
   spread(origin, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
@@ -1367,9 +1501,9 @@ table_ha_total_recent_origins %>%
 
 ### Daily, past 3 weeks
 
-```{r health_area_time_recent_origin_recent, fig.width = 12, fig.height = 8}
+```{r health_area_time_recent_origin, fig.width = 12, fig.height = 8}
 
-x_origins_recent <- x %>%
+x_origins_recent <- x_recent %>%
   filter(top_aires != "other",
          date > start_date) %>%
   count(date, origin, top_aires) 
@@ -1380,7 +1514,7 @@ ggplot(x_origins_recent, aes(x = date, y = n, fill = origin)) +
   scale_origins + 
   labs(x = "",
        y = "Nombre d'alertes par jour",
-       title = paste0("Nombre d'alertes par statut de validation",
+       title = paste0("Nombre d'alertes par origine",
                       " et aire de santé - Goma")) +
   large_txt +
   rotate_x_text(45) +
@@ -1394,8 +1528,7 @@ ggplot(x_origins_recent, aes(x = date, y = n, fill = origin)) +
 
 ```{r table_ha_over_time_recent_origins, fig.width = 12, fig.height = 5}
 
-table_ha_over_time_recent_origins <- x %>%
-  filter(date > start_date) %>%
+table_ha_over_time_recent_origins <- x_recent %>%
   count(date, top_aires, origin) %>%
   spread(origin, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
@@ -1626,7 +1759,7 @@ table_hz_over_time_decisions %>%
 
 ### Total past 3 weeks
 
-``` {r health_zone_total_recent_decision_recent}
+``` {r health_zone_total_recent_decision}
 
 ggplot(outcomes_recent, aes(x = top_zones, fill = decision_comparison)) +
   geom_bar() +
@@ -1694,13 +1827,13 @@ table_hz_over_time_recent_decisions %>%
 
 ### Total since database start
 
-Only area with at least 100 alerts are presented in the graph all areas are presented in the table. 
+Graphs are split by greater or less than 100 alerts removed all are kept in table. 
 
-``` {r health_area_total_decisions, fig.width = 14}
+```{r health_area_total_decisionsgreater100, fig.width = 14}
 
 x_decisions <- outcomes %>%
   count(decision_comparison, zone_de_sante, aire_de_sante) %>%
-  filter(n >= 100)
+  filter(aire_de_sante %in% greater_100)  
 
 ggplot(x_decisions, 
        aes(x = aire_de_sante, y = n, fill = decision_comparison)) +
@@ -1714,6 +1847,31 @@ ggplot(x_decisions,
        y = "Nombre d'alertes",
        title = "Nombre d'alertes par décision de validation et aire de santé",
        subtitle = "avec plus de 100 alertes") +
+  theme(legend.position = "bottom") +
+  large_txt +
+  rotate_x_text(45)
+
+
+```
+
+```{r health_area_total_decisionsless100, fig.width = 14}
+
+x_decisions <- outcomes %>%
+  count(decision_comparison, zone_de_sante, aire_de_sante) %>%
+  filter(aire_de_sante %in% less_100)
+
+ggplot(x_decisions, 
+       aes(x = aire_de_sante, y = n, fill = decision_comparison)) +
+  geom_col() +
+  scale_x_discrete(drop = FALSE) +
+  scale_decisions +
+  facet_grid(. ~ zone_de_sante, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes",
+       title = "Nombre d'alertes par décision de validation et aire de santé",
+       subtitle = "avec moins de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1778,14 +1936,14 @@ table_ha_over_time_decisions %>%
 
 ### Total past 3 weeks
 
-Only area with atleast than 20 alerts are presented in the graph all areas are presented in the table. 
+Graphs are split by greater or less than 20 alerts removed all are kept in table.  
 
-``` {r health_area_total_recent_decision, fig.width = 14}
+```{r health_area_total_recent_decision_greater20, fig.width = 14}
 
-x_decisions <- outcomes %>%
+x_decisions <- outcomes_recent %>%
   filter(date > start_date) %>%
   count(decision_comparison, zone_de_sante, aire_de_sante) %>%
-  filter(n >= 20) 
+  filter(aire_de_sante %in% greater_20_recent)  
 
 ggplot(x_decisions, 
        aes(x = aire_de_sante, y = n, fill = decision_comparison)) +
@@ -1807,12 +1965,39 @@ ggplot(x_decisions,
 
 ```
 
+```{r health_area_total_recent_decision_less20, fig.width = 14}
+
+x_decisions <- outcomes_recent %>%
+  filter(date > start_date) %>%
+  count(decision_comparison, zone_de_sante, aire_de_sante) %>%
+  filter(aire_de_sante %in% less_20_recent)    
+
+ggplot(x_decisions, 
+       aes(x = aire_de_sante, y = n, fill = decision_comparison)) +
+  geom_col() +
+  scale_x_discrete(drop = FALSE) +
+  scale_decisions +
+  facet_grid(. ~ zone_de_sante, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes",
+       title = paste("Nombre d'alertes par décision de validation et aire de santé",
+                     "\ndepuis les 3 semaines dernières"),
+       subtitle = "avec moins de 20 alertes") +
+  theme(legend.position = "bottom") +
+  large_txt +
+  rotate_x_text(45)
+
+
+```
+
 
 ### Table - total past 3 weeks 
 
 ```{r table_ha_total_recent_decisions, fig.keep = "all"}
 
-table_ha_total_recent_decisions <- outcomes %>%
+table_ha_total_recent_decisions <- outcomes_recent %>%
   count(aire_de_sante, decision_comparison) %>%
   spread(decision_comparison, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
@@ -1826,7 +2011,7 @@ table_ha_total_recent_decisions %>%
 
 ```{r health_area_time_recent_decision_recent, fig.width = 12, fig.height = 8}
 
-x_decisions_recent <- outcomes %>%
+x_decisions_recent <- outcomes_recent %>%
   filter(top_aires != "other",
          date > start_date)
 
@@ -1850,7 +2035,7 @@ ggplot(x_decisions_recent, aes(x = date, fill = decision_comparison)) +
 
 ```{r table_ha_over_time_recent_decisions}
 
-table_ha_over_time_recent_decisions <- outcomes %>%
+table_ha_over_time_recent_decisions <- outcomes_recent %>%
   filter(date > start_date) %>%
   count(date, top_aires, decision_comparison) %>%
   spread(decision_comparison, n, fill = 0) %>%
@@ -1922,10 +2107,14 @@ ggplot(data = x_alert_rate_sous_co,
 
 ```{r table_alert_rates_per_week, fig.keep = "all"}
 
+check_iconnu <- max(x_alert_rate_sous_co$status == "statut_inconnu")
+
 table_alert_rates_per_week <- x_alert_rate_sous_co %>%
   select(-alert_rate) %>% 
   spread(status, n, fill = 0) %>% 
-  mutate(total = statut_inconnu + invalidee + validee,
+  mutate(total = ifelse(check_iconnu,
+              statut_inconnu + invalidee + validee,
+              invalidee + validee),
          alert_rate = 10000 * total / total_population,
          alert_rate = round(alert_rate, 4))
 
@@ -1965,10 +2154,15 @@ ggplot(data = x_alert_rate_sous_co, aes(x = date,
 
 ```{r table_alert_rates_recent, fig.keep = "all"}
 
+check_iconnu <- max(x_alert_rate_sous_co$status == "statut_inconnu")
+
+
 table_alert_rates_recent <- x_alert_rate_sous_co %>%
   select(-alert_rate) %>% 
   spread(status, n, fill = 0) %>% 
-  mutate(total = statut_inconnu + invalidee + validee,
+  mutate(total = ifelse(check_iconnu,
+              statut_inconnu + invalidee + validee,
+              invalidee + validee),
          alert_rate = 10000 * total / total_population,
          alert_rate = round(alert_rate, 4))
 
@@ -2158,7 +2352,7 @@ ggplot(data = x_alert_rate_aire_sante, aes(x = epiweek_report_label,
 
 ``` {r alert_rate_as_3_weeks, fig.width = 14}
 
-x_alert_rate_aire_sante_recent <- x %>%
+x_alert_rate_aire_sante_recent <- x_recent %>%
   filter(top_zones != "other",
          date > start_date,
          as_population > 0) %>%
@@ -2325,6 +2519,11 @@ to_export <- c("cleaned_alerts_database_goma",
 ```
 
 ```{r xlsx_exports, eval = TRUE}
+
+## check if a directory exists and if not then creates it
+if (!dir.exists("produced_xlsx")) {
+  dir.create("produced_xlsx")
+}
 
 for (e in to_export) {
   rio::export(get(e),

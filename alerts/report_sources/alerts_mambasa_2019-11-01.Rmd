@@ -1495,7 +1495,7 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
 
 ```{r table_ha_total_recent_origins, fig.keep = "all"}
 
-table_ha_total_recent_origins <- x %>%
+table_ha_total_recent_origins <- x_recent %>%
   count(aire_de_sante, origin) %>%
   spread(origin, n, fill = 0) %>% 
   adorn_totals(where = c("row", "col"))
@@ -1534,7 +1534,7 @@ ggplot(x_origins_recent, aes(x = date, y = n, fill = origin)) +
 
 ```{r table_ha_over_time_recent_origins, fig.width = 12, fig.height = 5}
 
-table_ha_over_time_recent_origins <- x %>%
+table_ha_over_time_recent_origins <- x_recent %>%
   filter(date > start_date) %>%
   count(date, top_aires, origin) %>%
   spread(origin, n, fill = 0) %>%
