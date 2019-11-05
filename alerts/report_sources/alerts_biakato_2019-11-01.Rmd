@@ -1509,7 +1509,7 @@ table_ha_total_recent_origins %>%
 
 ```{r health_area_time_recent_origin_recent, fig.width = 12, fig.height = 8}
 
-x_origins_recent <- x %>%
+x_origins_recent <- x_recent %>%
   filter(top_aires != "other",
          date > start_date) %>%
   count(date, origin, top_aires) 
@@ -2359,7 +2359,7 @@ ggplot(data = x_alert_rate_aire_sante, aes(x = epiweek_report_label,
 
 ``` {r alert_rate_as_3_weeks, fig.width = 14}
 
-x_alert_rate_aire_sante_recent <- x %>%
+x_alert_rate_aire_sante_recent <- x_recent %>%
   filter(top_zones != "other",
          date > start_date,
          as_population > 0) %>%
