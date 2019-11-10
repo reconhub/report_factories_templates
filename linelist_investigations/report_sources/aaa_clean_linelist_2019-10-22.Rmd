@@ -197,7 +197,7 @@ x <- x_raw %>%
   mutate(current_status = final_outcome) %>%
   mutate(report_status = statusreport_mdc) %>% 
   mutate(outcome = final_outcome) %>% 
-  mutate(zone_de_sante = zs_calc) %>% 
+  mutate(zone_de_sante = zs_cnc) %>% 
   mutate(aire_de_sante = health_area) %>%
   mutate(age = age_cnc) %>%
   mutate(gender = sex) %>% 
