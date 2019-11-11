@@ -550,7 +550,7 @@ kpi_total_2 <-
   count(type_death) %>% 
   mutate(freq = (n / sum(n) * 100) %>% round(1)) %>% 
   mutate(top_zones = "Overall") %>% 
-  filter(type_death %in% TRUE) %>% 
+  filter(type_death == "community") %>% 
   mutate(type_death = str_c(n, " (", freq, "%)")) %>% 
   select(top_zones, type_death)
 
@@ -559,7 +559,7 @@ kpi_total_3 <-
   count(registered_surveilled) %>% 
   mutate(freq = (n / sum(n) * 100) %>% round(1)) %>% 
   mutate(top_zones = "Overall") %>% 
-  filter(registered_surveilled %in% TRUE) %>% 
+  filter(registered_surveilled) %>% 
   mutate(registered_surveilled = str_c(n, " (", freq, "%)")) %>% 
   select(top_zones, registered_surveilled)
 
