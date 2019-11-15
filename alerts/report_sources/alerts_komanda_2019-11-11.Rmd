@@ -1,6 +1,6 @@
 ---
-title: "Investigation of alerts data: Beni"
-author: "Charlie Whittaker, Christopher Jarvis,  Thibaut Jombart, Flavio Finger, Jonathan Polonsky, Patrick Keating, and Amy Gimma for the analytic cell OEC Beni"
+title: "Investigation of alerts data: Komanda"
+author: "Charlie Whittaker, Christopher Jarvis,  Thibaut Jombart, Flavio Finger, Jonathan Polonsky, Patrick Keating, Amy Gimma and Aminata Ndiaye for the analytic cell OEC Goma"
 date: "`r format(Sys.time(), '%A %d %B %Y')`"
 output:
   html_document: 
@@ -57,7 +57,7 @@ broken.** To make a contribution, carefully read the
 <!-- ======================================================= -->
 ## Outline
 
-This report cleans and analyses the alert data of Beni. Input comes from an
+This report cleans and analyses the alert data of Komanda. Input comes from an
 `xlsx` file containing alerts in a specific format. Because all
 sub-coordinations have different standards, each sub-coordination needs a
 separate report.
@@ -106,12 +106,12 @@ We extract the completion date from the file name:
 ```{r load_alerts_data}
 
 ## load the data
-current_beni
-x_raw <- custom_import(current_beni)
+current_komanda
+x_raw <- custom_import(current_komanda)
 glimpse(x_raw)
 
 ## extract database date from the file name
-file_name <- gsub("^[^.]+/", "", current_beni)
+file_name <- gsub("^[^.]+/", "", current_komanda)
 database_date <- file_name %>%
   guess_dates()
 database_date
@@ -139,16 +139,79 @@ We use *linelist*'s function `clean_data()` to:
   
 
 This cleaning is achieved with:
+Given Komanda special dataset organization, additional data management was done.
 
 ```{r data_cleaning}
 
 x <- x_raw %>%
-  clean_data(guess_dates = FALSE,
-             wordlists = cleaning_rules) %>%
+  mutate(origin_not_cleaned = origin) %>%
   as_tibble()
 
-```
+x <- x %>%
+  clean_data(guess_dates = FALSE,
+             wordlists = cleaning_rules)
 
+
+x <- x %>%
+  mutate(fievre= ifelse(grepl(c("fiev|fier"), symptomes, ignore.case=F), "oui"
+                          , "non"),
+          nausee_vom= ifelse(grepl(c("naus|vertig|vom"), symptomes, ignore.case=F), "oui"
+                            , "non"),
+         diarrhee=ifelse(grepl(c("diar"), symptomes, ignore.case=F), "oui"
+                         , "non"),
+         fatigue=ifelse(grepl(c("fatig|ast"), symptomes, ignore.case=F), "oui"
+                        , "non"),
+         anorexie=ifelse(grepl(c("anorex"), symptomes, ignore.case=F), "oui"
+                         , "non"),
+         dlr_abdo=ifelse(grepl(c("abd"), symptomes, ignore.case=F), "oui"
+                         , "non"),
+         dlr_thorax= ifelse(grepl(c("thora|resp"), symptomes, ignore.case=F), "oui"
+                            , "non"),
+         dlr_muscu=ifelse(grepl(c("muscu"), symptomes, ignore.case=F), "oui"
+                          , "non"),
+         dlr_artic=ifelse(grepl(c("artic"), symptomes, ignore.case=F), "oui"
+                          , "non"),
+         cephalee=ifelse(grepl(c("cephal"), symptomes, ignore.case=F), "oui"
+                         , "non"),
+         toux=ifelse(grepl(c("toux"), symptomes, ignore.case=F), "oui"
+                     , "non"),
+         mal_de_gorge=ifelse(grepl(c("gorge"), symptomes, ignore.case=F), "oui"
+                     , "non"),
+         dyspnee=ifelse(grepl(c("dyspn"), symptomes, ignore.case=F), "oui"
+                        , "non"),
+         dysphagie=ifelse(grepl(c("dyspha"), symptomes, ignore.case=F), "oui"
+                          , "non"),
+         hoquet=ifelse(grepl(c("hoquet"), symptomes, ignore.case=F), "oui"
+                       , "non"),
+         saignements= ifelse(grepl(c("saign|sang|hemor"), symptomes, ignore.case=F), "oui"
+                             , "non")
+ )
+
+#Now modify the type or origin var with lot of "autre" by using info in type and origin
+##When there is PS or CS or UTI, HGR, POE: it is surv passive ie healthcare services
+##telephone is recherche active
+
+#first cretate a cat var that says whether or not a healthcare place was implicated
+x <- x %>%
+  mutate(hc_place= ifelse(
+                    grepl(c("ps|cs|poe|hgr|uti|clini|infir"), origin_not_cleaned, ignore.case=F), "oui", "non")
+  )
+#|surv
+
+x <- x %>%
+  mutate(origin_final= ifelse(
+    type %in% c(NA,"autre") & (hc_place=="oui" | origin_not_cleaned=="surveillance"), "surveillance_passive", type)
+  ) %>%
+  select(-origin)
+
+#after this cleaning the remaining origin_final == autre seem to be "communautaire"
+
+x <- x %>%
+  mutate(origin_final= ifelse(
+    origin_final=="autre", "communautaire", origin_final)
+  )
+
+```
 <!-- ======================================================= -->
 ## Renaming variables and sanity checks
 
@@ -173,20 +236,24 @@ x <- x %>% filter(!is.na(date))
 table(x$sexe, useNA = "ifany")
 
 ## contact connu
-x <- mutate(x, contact_connu = lien_epidemiologique)
+x <- mutate(x, contact_connu = lien_epi)
 table(x$contact_connu, useNA = "ifany")
 
 ## zone de sante
-x <- mutate(x, zone_de_sante = as.character(zone_de_sante)) 
+x <- mutate(x, zone_de_sante = as.character(zs)) 
 table(x$zone_de_sante, useNA = "ifany")
 
+## aire de sante
+x <- mutate(x, aire_de_sante = as.character(as)) 
+table(x$aire_de_sante, useNA = "ifany")
+
 ## origin / source_notif
-x <- mutate(x, origin = moyen_de_transmission)
+x <- mutate(x, origin = origin_final)
 table(x$origin, useNA = "ifany")
 
 # create variable for alert validation
-x <- x %>%
-  mutate(status = conclusion_finale_de_l_investigation) %>%
+x <- x %>% mutate(
+  status = ifelse(ccs == "inconnu", "statut_inconnu", ccs)) %>%
   mutate(status = factor(status, levels = c("statut_inconnu", 
                                             "invalidee", 
                                             "validee")))
@@ -214,7 +281,7 @@ was reported in.
 - `top_zones` - which describes the 3 most active Zone de Santes (other Zone de 
 Santes) are grouped into "other".
 - `top_aires` - which describes the 14 most active Aire de Santes (out of all the
-legitimate Aire de Santes belonging to Beni present in the database). Note - All 
+legitimate Aire de Santes belonging to Komanda present in the database). Note - All 
 other Aire de Santes are aggregated into the category "other".
 
 Note - All other Aire de Santes are aggregated into the category "other".
@@ -223,10 +290,7 @@ Note - All other Aire de Santes are aggregated into the category "other".
 
 ## bleed
 bleed <- x %>%
-  select(contains("saignement"),
-         contains("sang"), 
-         contains("hemorag")
-         ) %>%
+  select(contains("saignement")) %>%
   apply(1, function(e) ifelse(any(e == "oui"), "oui", "non"))
 x <- mutate(x, bleed = bleed)
 table(x$bleed, useNA = "ifany")
@@ -406,8 +470,8 @@ prop_linked <- sum(number_individuals_aire_linked / number_individuals)
 table(x$aire_de_sante[is.na(x$as_population)]) # aire de santes in database we're not matching
 
 # Identifying Aire de Santes with missing population data
-beni_ha_pop <- pop_data$population
-index <- which(is.na(beni_ha_pop))
+komanda_ha_pop <- pop_data$population
+index <- which(is.na(komanda_ha_pop))
 non_pop_data <- pop_data$aire_de_sante[index]
 
 # Identifying number of alerts linked to Aire de Sante with 
@@ -438,26 +502,20 @@ variable which asserts these conditions:
 has_contact <- outcomes$contact_connu %in% c("confirme", "oui")
 has_one_symptom <- outcomes %>%
   select(fievre,
-         nausees_vomissement,
-         diarrhees,
-         fatigue_intense,
-         perte_d_appetit_anorexie,
-         douleur_abdminales,
-         douleur_thoraciques,
-         douleur_musculaires,
-         douleurs_articulaires,
-         cephalees,
+         nausee_vom,
+         diarrhee,
+         fatigue,
+         anorexie,
+         dlr_abdo,
+         dlr_thorax,
+         dlr_muscu,
+         dlr_artic,
+         cephalee,
          toux,
-         difficulte_respirer,
-         difficulte_a_avaler,
-         mal_a_la_gorge,
-         ictere_conjonctives_gencives_peau,
-         conjonctivite_oeil_rouge,
-         eruption_cutanees,
+         dyspnee,
+         dysphagie,
+         mal_de_gorge,
          hoquet,
-         douleurs_retro_orbitaires_photophobie,
-         coma_perte_de_conscience,
-         confusion_ou_desorientation,
          bleed) %>%
   apply(1, function(e) any(e == "oui", na.rm = TRUE))
 fits_1 <- has_contact & has_one_symptom
@@ -469,26 +527,20 @@ fits_2 <- !fits_1 & has_bleeding
 ## criteria 3
 has_fever <- outcomes$fievre == "oui"
 has_3_symptoms <- outcomes %>%
-    select(nausees_vomissement,
-         diarrhees,
-         fatigue_intense,
-         perte_d_appetit_anorexie,
-         douleur_abdminales,
-         douleur_thoraciques,
-         douleur_musculaires,
-         douleurs_articulaires,
-         cephalees,
+    select(nausee_vom,
+         diarrhee,
+         fatigue,
+         anorexie,
+         dlr_abdo,
+         dlr_thorax,
+         dlr_muscu,
+         dlr_artic,
+         cephalee,
          toux,
-         difficulte_respirer,
-         difficulte_a_avaler,
-         mal_a_la_gorge,
-         ictere_conjonctives_gencives_peau,
-         conjonctivite_oeil_rouge,
-         eruption_cutanees,
+         dyspnee,
+         dysphagie,
+         mal_de_gorge,
          hoquet,
-         douleurs_retro_orbitaires_photophobie,
-         coma_perte_de_conscience,
-         confusion_ou_desorientation,
          bleed) %>% 
   apply(1, function(e) sum(e == "oui", na.rm = TRUE)) >= 3
 fits_3 <- !fits_1 & !fits_2 & has_fever & has_3_symptoms
@@ -554,6 +606,7 @@ outcomes_recent <- filter(outcomes, date > start_date)
 
 ```
 
+
 <!-- ======================================================= -->
 ## Alerts counts split
 
@@ -587,7 +640,6 @@ less_20_recent[less_20_recent %in% greater_20_recent] <- NA
 less_20_recent <- less_20_recent[complete.cases(less_20_recent)]
   
 ```
-
 
 <!-- ======================================================= -->
 ## Custom color scales
@@ -629,10 +681,6 @@ scale_validations <- scale_fill_manual(
 ```
 
 
-<!-- ======================================================= -->
-<!-- ======================================================= -->
-<!-- ======================================================= -->
-
 # Validation status {.tabset .tabset-fade .tabset-pills}
 
 <!-- ======================================================= -->
@@ -656,7 +704,7 @@ ggplot(x, aes(x = date, fill = status)) +
   scale_validations + 
   labs(x = "",
        y = "Nombre d'alertes par semaine",
-       title = paste0("Nombre d'alertes par statut de validation - Beni")) +
+       title = paste0("Nombre d'alertes par statut de validation - Komanda")) +
   large_txt +
   rotate_x_text(45) + 
   scale_months +
@@ -691,8 +739,8 @@ ggplot(x_recent, aes(x = date, fill = status)) +
   scale_validations + 
   labs(x = "",
        y = "Nombre d'alertes par jour",
-       title = paste0("Nombre d'alertes par statut de validation - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+       title = paste0("Nombre d'alertes par statut de validation - Komanda"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   scale_weeks +
@@ -736,7 +784,7 @@ ggplot(x_prop, aes(x = epiweek_report_label, col = "#D56F3E")) +
   ylim(c(0, 100)) +
   labs(x = "",
        y = "Pourcentage d'alertes validées \npar semaine",
-       title = paste0("Proportion d'alertes validées - Beni")) +
+       title = paste0("Proportion d'alertes validées - Komanda")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -758,7 +806,7 @@ ggplot(x, aes(x = top_zones, fill = status)) +
   scale_validations +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par statut de validation et \nzone de santé - Beni") +
+       title = "Nombre d'alertes par statut de validation et \nzone de santé - Komanda") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -790,10 +838,10 @@ ggplot(x, aes(x = date, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
        title = paste0("Nombre d'alertes par statut de validation ",
-                      " et zone de santé - Beni")) +
+                      " et zone de santé - Komanda")) +
   large_txt +
   rotate_x_text(45) +
-  theme(legend.position = "bottom") +
+  theme(legend.position = "bottom", strip.text = element_text(size=17)) +
   scale_months
 
 ```
@@ -827,9 +875,8 @@ ggplot(x_recent, aes(x = top_zones, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes",
        title = paste("Nombre d'alertes par statut de validation",
-                     "et \nzone de santé - Beni"), 
-subtitle = "Données des trois dernières semaines") +
-  theme(legend.position = "bottom") +
+                     "et \nzone de santé - Komanda"),
+      subtitle = "Données des 3 dernières semaines ") +  theme(legend.position = "bottom") +
   large_txt 
 
 ```
@@ -860,11 +907,11 @@ ggplot(x_recent, aes(x = date, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par statut de validation ",
-                      "et zone de santé - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+                      "et zone de sante - Komanda"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
-  theme(legend.position = "bottom") +
+  theme(legend.position = "bottom", strip.text = element_text(size=17)) +
   scale_weeks
 
 ```
@@ -898,20 +945,18 @@ x_validations <- x %>%
 
 ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
   geom_col() +
-  scale_x_discrete(drop = FALSE) +
+  scale_x_discrete(drop = TRUE) +
   scale_validations +
   facet_grid(. ~ zone_de_sante, scales = "free_x", space = "free") +
   theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par statut de validation et aire de santé - Beni",
+       title = "Nombre d'alertes par statut de validation et aire de santé - Komanda",
        subtitle = "avec plus de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
-
-
 
 
 ```
@@ -920,7 +965,7 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
 
 x_validations <- x %>%
   count(status, zone_de_sante, aire_de_sante) %>%
-  filter(aire_de_sante %in% less_100, n >= 5)
+  filter(aire_de_sante %in% less_100)
 
 ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
   geom_col() +
@@ -931,7 +976,7 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par statut de validation et aire de santé - Beni",
+       title = "Nombre d'alertes par statut de validation et aire de santé - Komanda",
        subtitle = "avec moins de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
@@ -939,7 +984,6 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
 
 
 ```
-
 
 ### Table - total since database start  
 
@@ -966,7 +1010,7 @@ ggplot(x, aes(x = epiweek_report_label, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
        title = paste0("Nombre d'alertes par statut de validation",
-                      " et aire de santé - Beni")) +
+                      " \net aire de santé - Komanda")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1014,8 +1058,8 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes",
        title = paste("Nombre d'alertes par statut de validation et aire de santé",
-                     " (avec plus de 20 alertes) - Beni"),
-        subtitle = "Données des trois dernières semaines") +
+                     "\n(avec plus de 20 alertes) - Komanda"),
+        subtitle = "Données des 3 dernières semaines") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1041,8 +1085,8 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes",
        title = paste("Nombre d'alertes par statut de validation et aire de santé",
-                     " (avec moins de 20 alertes) - Beni "),
-        subtitle = "Données des trois dernières semaines") +
+                     "\n(avec moins de 20 alertes) - Komanda"),
+        subtitle = "Données des 3 dernières semaines") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1080,8 +1124,8 @@ ggplot(x_validations, aes(x = date, y = n, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par statut de validation",
-                      " et aire de santé - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+                      " et aire de santé - Komanda"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1135,7 +1179,7 @@ ggplot(x, aes(x = epiweek_report_label, fill = origin)) +
   guides(fill = guide_legend(ncol = 2)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
-       title = "Nombre d'alertes par origine - Beni") +
+       title = "Nombre d'alertes par origine - Komanda") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45) +
@@ -1174,9 +1218,9 @@ ggplot(x_recent, aes(x = date, fill = origin)) +
   large_txt +
   theme(legend.position = "bottom",
         panel.spacing.y = unit(1, "lines")) +
-  labs(title = "Nombre d'alertes par origine - Beni",
-subtitle = "Données des trois dernières semaines",
-     x = "",
+  labs(title = "Nombre d'alertes par origine - Komanda",
+       subtitle = "Données des 3 dernières semaines ",
+       x = "",
        y = "Nombre d'alertes par jour") +
   scale_weeks
 
@@ -1210,7 +1254,7 @@ ggplot(x, aes(x = top_zones, fill = origin)) +
   guides(fill = guide_legend(ncol = 2)) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par origine et zone de santé - Beni") +
+       title = "Nombre d'alertes par origine et zone de santé - Komanda") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1241,8 +1285,8 @@ ggplot(x, aes(x = date, fill = origin)) +
   scale_origins + 
   labs(x = "",
        y = "Nombre d'alertes par semaine",
-       title = paste0("Nombre d'alertes par origine",
-                      "et zone de santé - Beni")) +
+       title = paste0("Nombre d'alertes par origine de validation ",
+                      "et zone de santé - Komanda")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1278,8 +1322,8 @@ ggplot(x_recent, aes(x = top_zones, fill = origin)) +
   guides(fill = guide_legend(ncol = 2)) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = paste("Nombre d'alertes par origine et zone de santé - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+       title = paste("Nombre d'alertes par origine et zone de santé - Komanda"), 
+        subtitle = "Données des 3 dernières semaines ") +
   theme(legend.position = "bottom") +
   large_txt 
 
@@ -1310,9 +1354,9 @@ ggplot(x_recent, aes(x = date, fill = origin)) +
   scale_origins + 
   labs(x = "",
        y = "Nombre d'alertes par jour",
-       title = paste0("Nombre d'alertes par origine ",
-                      "et zone de sante - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+       title = paste0("Nombre d'alertes par origine",
+                      " et zone de santé - Komanda"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1341,7 +1385,7 @@ table_hz_over_time_recent_origins %>%
 
 Graphs are split by greater or less than 100 alerts removed all are kept in table. 
 
-```{r health_area_total_origins_greater100, fig.width = 14}
+```{r health_area_total_origins_greter100, fig.width = 14}
 
 x_origins <- x %>%
   count(origin, zone_de_sante, aire_de_sante) %>%
@@ -1357,7 +1401,7 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par origine et aire de santé - Beni",
+       title = "Nombre d'alertes par origine et aire de santé - Komanda",
        subtitle = "avec plus de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
@@ -1383,7 +1427,7 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par origine et aire de santé - Beni",
+       title = "Nombre d'alertes par origine et aire de santé - Komanda",
        subtitle = "avec moins de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
@@ -1391,6 +1435,7 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
 
 
 ```
+
 ### Table - total since database start  
 
 
@@ -1420,7 +1465,7 @@ ggplot(x_origins, aes(x = epiweek_report_label, fill = origin)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
        title = paste0("Nombre d'alertes par origine",
-                      " et zone de sante - Beni")) +
+                      " et zone de santé - Komanda")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1465,8 +1510,9 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = paste("Nombre d'alertes par origine et aire de santé (avec plus de 20 alertes) - Beni"),
-       subtitle = "Données des trois dernières semaines") +
+       title = paste("Nombre d'alertes par origine et aire de santé",
+                     "\n(avec plus de 20 alertes) - Komanda"),
+       subtitle = "Données des 3 dernières semaines ") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1490,8 +1536,9 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = paste("Nombre d'alertes par origine et aire de santé (avec moins de 20 alertes) - Beni"),
-       subtitle = "Données des trois dernières semaines") +
+       title = paste("Nombre d'alertes par origine et aire de santé",
+                     "\n(avec moins de 20 alertes) - Komanda"),
+       subtitle = "Données des 3 dernières semaines ") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1516,7 +1563,7 @@ table_ha_total_recent_origins %>%
 
 ### Daily, past 3 weeks
 
-```{r health_area_time_recent_origin_recent, fig.width = 12, fig.height = 8}
+```{r health_area_time_recent_origin, fig.width = 12, fig.height = 8}
 
 x_origins_recent <- x_recent %>%
   filter(top_aires != "other") %>%
@@ -1529,8 +1576,8 @@ ggplot(x_origins_recent, aes(x = date, y = n, fill = origin)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par origine",
-                      " et aire de santé - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+                      " et aire de santé - Komanda"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1552,6 +1599,7 @@ table_ha_over_time_recent_origins %>%
  show_table()
   
 ```
+
 
 <!-- ======================================================= -->
 <!-- ======================================================= -->
@@ -1595,7 +1643,7 @@ ggplot(outcomes, aes(x = epiweek_report_label, fill = decision_comparison)) +
   scale_x_discrete(drop = FALSE) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par décision de validation - Beni") +
+       title = "Nombre d'alertes par décision de validation - Komanda") +
   theme(legend.position = "bottom") +
   large_txt +
   scale_decisions +
@@ -1679,9 +1727,9 @@ ggplot(outcomes_recent, aes(x = date, fill = decision_comparison)) +
   large_txt +
   scale_decisions +
   theme(legend.position = "bottom") +
-  labs(title = paste("Nombre d'alertes par décision de validation - Beni"),
-subtitle = "Données des trois dernières semaines",
-      x = "",
+  labs(title = paste("Nombre d'alertes par décision de validation - Komanda"),
+       subtitle = "Données des 3 dernières semaines",
+       x = "",
        y = "Nombre d'alertes par jour") +
   scale_weeks
 
@@ -1715,7 +1763,7 @@ ggplot(outcomes, aes(x = top_zones, fill = decision_comparison)) +
   scale_decisions +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par décision et zone de santé - Beni") +
+       title = "Nombre d'alertes par décision et zone de santé - Komanda") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1747,7 +1795,7 @@ ggplot(outcomes, aes(x = date, fill = decision_comparison)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
        title = paste0("Nombre d'alertes par décision de validation ",
-                      "et zone de santé - Beni")) +
+                      "et zone de santé - Komanda")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1774,7 +1822,7 @@ table_hz_over_time_decisions %>%
 
 ### Total past 3 weeks
 
-``` {r health_zone_total_recent_decision_recent}
+``` {r health_zone_total_recent_decision}
 
 ggplot(outcomes_recent, aes(x = top_zones, fill = decision_comparison)) +
   geom_bar() +
@@ -1782,8 +1830,8 @@ ggplot(outcomes_recent, aes(x = top_zones, fill = decision_comparison)) +
   scale_decisions +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = paste("Nombre d'alertes par décision et zone de santé - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+       title = paste("Nombre d'alertes par décision et", " \nzone de santé - Komanda"),
+        subtitle = "Données des 3 dernières semaines ") +
   theme(legend.position = "bottom") +
   large_txt
 
@@ -1814,8 +1862,8 @@ ggplot(outcomes_recent, aes(x = date, fill = decision_comparison)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par décision de validation ",
-                      "et zone de sante - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+                      "et zone de santé - Komanda"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1861,7 +1909,7 @@ ggplot(x_decisions,
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par décision de validation et aire de santé - Beni",
+       title = "Nombre d'alertes par décision de validation", " \net aire de santé - Komanda",
        subtitle = "avec plus de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
@@ -1886,7 +1934,7 @@ ggplot(x_decisions,
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par décision de validation et aire de santé - Beni",
+       title = "Nombre d'alertes par décision de validation", " \net aire de santé - Komanda",
        subtitle = "avec moins de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
@@ -1924,7 +1972,7 @@ ggplot(x_decisions, aes(x = epiweek_report_label, fill = decision_comparison)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
        title = paste0("Nombre d'alertes par décision de validation",
-                      " et aire de sante - Beni")) +
+                      " et aire de santé - Komanda")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1970,8 +2018,8 @@ ggplot(x_decisions,
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = paste("Nombre d'alertes par décision de validation et aire de santé (avec plus de 20 alertes) - Beni"),
-       subtitle = "Données des trois dernières semaines") +
+       title = paste0("Nombre d'alertes par décision de validation", " \net aire de santé (avec plus de 20 alertes) - Komanda"),
+       subtitle = "Données des 3 dernières semaines") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1995,14 +2043,15 @@ ggplot(x_decisions,
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = paste("Nombre d'alertes par décision de validation et aire de santé (avec moins de 20 alertes) - Beni"),
-       subtitle = "Données des trois dernières semaines") +
+       title = paste0("Nombre d'alertes par décision de validation", " \net aire de santé (avec moins de 20 alertes) - Komanda"),
+       subtitle = "Données des 3 dernières semaines") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
 
 
 ```
+
 
 ### Table - total past 3 weeks 
 
@@ -2023,7 +2072,8 @@ table_ha_total_recent_decisions %>%
 ```{r health_area_time_recent_decision_recent, fig.width = 12, fig.height = 8}
 
 x_decisions_recent <- outcomes_recent %>%
-  filter(top_aires != "other")
+  filter(top_aires != "other",
+         date > start_date)
 
 ggplot(x_decisions_recent, aes(x = date, fill = decision_comparison)) +
   geom_bar() +
@@ -2032,8 +2082,8 @@ ggplot(x_decisions_recent, aes(x = date, fill = decision_comparison)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par décision de validation",
-                      " et aire de santé - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+                      " et aire de santé - Komanda"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2081,8 +2131,7 @@ if(allNA(x$as_population)){
   knitr::opts_chunk$set(eval = FALSE)
   no_pop_data <- TRUE
   cat("There is no population data therefore alert rates can not be calculated.")
-} 
-
+}
 
 ```
 
@@ -2104,7 +2153,7 @@ ggplot(data = x_alert_rate_sous_co,
   scale_validations + 
   labs(x = "",
        y = "Nombre d'alertes par semaine \net par 10,000 personnes",
-       title = paste0("Nombre d'alertes par 10000 personnes - Beni")) +
+       title = paste0("Nombre d'alertes par 10000 personnes -  Komanda")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2117,10 +2166,14 @@ ggplot(data = x_alert_rate_sous_co,
 
 ```{r table_alert_rates_per_week, fig.keep = "all"}
 
+check_iconnu <- max(x_alert_rate_sous_co$status == "statut_inconnu")
+
 table_alert_rates_per_week <- x_alert_rate_sous_co %>%
   select(-alert_rate) %>% 
   spread(status, n, fill = 0) %>% 
-  mutate(total = invalidee + validee,
+  mutate(total = ifelse(check_iconnu,
+              statut_inconnu + invalidee + validee,
+              invalidee + validee),
          alert_rate = 10000 * total / total_population,
          alert_rate = round(alert_rate, 4))
 
@@ -2147,8 +2200,8 @@ ggplot(data = x_alert_rate_sous_co, aes(x = date,
   scale_validations + 
   labs(x = "",
        y = "Nombre d'alertes par jour \net par 10,000 personnes",
-       title = paste0("Nombre d'alertes par 10000 personnes - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+       title = paste0("Nombre d'alertes par 10000 personnes -  Komanda"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2160,10 +2213,15 @@ subtitle = "Données des trois dernières semaines") +
 
 ```{r table_alert_rates_recent, fig.keep = "all"}
 
+check_iconnu <- max(x_alert_rate_sous_co$status == "statut_inconnu")
+
+
 table_alert_rates_recent <- x_alert_rate_sous_co %>%
   select(-alert_rate) %>% 
   spread(status, n, fill = 0) %>% 
-  mutate(total = invalidee + validee,
+  mutate(total = ifelse(check_iconnu,
+              statut_inconnu + invalidee + validee,
+              invalidee + validee),
          alert_rate = 10000 * total / total_population,
          alert_rate = round(alert_rate, 4))
 
@@ -2196,7 +2254,7 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = zone_de_sante,
   labs(x = "",
        y = "Nombre d'alertes par semaine \net par 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
-                      "de validation et zone de santé - Beni")) +
+                      "de validation et zone de santé - Komanda")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom")
@@ -2222,7 +2280,7 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = epiweek_report_label,
   labs(x = "",
        y = "Nombre d'alertes par semaine \net par 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
-                      "de validation, et zone de santé - Beni")) +
+                      "de validation, et zone de santé - Komanda")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2238,7 +2296,7 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = epiweek_report_label,
 
 ``` {r alert_rate_zone_de_sante_weekly_validation_status_recent}
 
-x_alert_rate_zone_sante <- x_recent %>%
+x_alert_rate_zone_sante <- x %>%
   filter(
          as_population > 0,
          top_zones != "other") %>% 
@@ -2252,8 +2310,8 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = top_zones,
   labs(x = "",
        y = "Nombre d'alertes par semaine \net par 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
-                      "de validation et zone de santé - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+                      "de validation et zone de santé - Komanda"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   theme(legend.position = "bottom") 
 
@@ -2264,8 +2322,8 @@ subtitle = "Données des trois dernières semaines") +
 
 ``` {r alert_rate_zone_de_sante_daily_status, fig.height = 5, fig.width = 12}
 
-x_alert_rate_zone_sante <- x_recent %>%
-  filter(
+x_alert_rate_zone_sante <- x %>%
+  filter(date > start_date,
          zs_population > 0,
          top_zones != "other") %>%
   count(date, status, top_zones, zs_population) %>%
@@ -2279,8 +2337,8 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = date,
   labs(x = "",
        y = "Nombre d'alertes par jour \net par 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
-                      "de validation et zone de santé - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+                      "de validation et zone de santé - Komanda"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2315,7 +2373,7 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = aire_de_sante,
   labs(x = "",
        y = "Nombre d'alertes par semaine \net par 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes par statut ", 
-                      "de validation et aire de santé - Beni")) +
+                      "de validation et aire de santé - Komanda")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") 
@@ -2341,7 +2399,7 @@ ggplot(data = x_alert_rate_aire_sante, aes(x = epiweek_report_label,
   labs(x = "",
        y = "Nombre d'alertes par semaine et \npar 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes par statut", 
-                      " de validation et aire de santé - Beni")) +
+                      " de validation et aire de santé - Komanda")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2369,8 +2427,8 @@ ggplot(data = x_alert_rate_aire_sante_recent, aes(x = aire_de_sante,
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes par 10000 \npersonnes et par semaine",
-       title = paste0("Nombre d'alertes par 10000 personnes et par semaine - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+       title = paste0("Nombre d'alertes par 10000 personnes - Komanda"), 
+        subtitle = "Données des 3 dernières semaines ") + 
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") 
@@ -2396,8 +2454,9 @@ ggplot(data = x_alert_rate_aire_sante, aes(x = date,
   scale_validations +
   labs(x = "",
        y = "Nombre d'alertes par jour et \npar 10,000 personnes",
-       title = paste0("Nombre d'alertes par 10000 personnes par statut  - Beni"), 
-subtitle = "Données des trois dernières semaines") +
+       title = paste0("Nombre d'alertes par 10000 personnes par statut", 
+                      " de validation et aire de santé - Komanda"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2439,7 +2498,7 @@ if (!dir.exists("produced_rds")) {
 
 ## create the text for the file name with the database date
 rds_file_name <- sprintf("%sclean_%s.rds",
-                     undated_file_name(current_beni),
+                     undated_file_name(current_komanda),
                      format(database_date, "%Y-%m-%d"))
 rds_file_name
 
@@ -2481,9 +2540,9 @@ stored inside the folder `produced_xlsx`:
 
 ```{r exports_tables, eval = TRUE}
 
-cleaned_alerts_database_beni <- x
+cleaned_alerts_database_komanda <- x
 
-to_export <- c("cleaned_alerts_database_beni",
+to_export <- c("cleaned_alerts_database_komanda",
                "table_validation_overall_time",
                "table_validation_overall_past_3_weeks",
                "table_hz_total_validation",
@@ -2541,7 +2600,7 @@ We copy the main data file to the `data/clean` folder:
 
 ## create the text for the file name with the database date
 xlsx_file_name <- sprintf("%sclean_%s.xlsx",
-                     undated_file_name(current_beni),
+                     undated_file_name(current_komanda),
                      format(database_date, "%Y-%m-%d"))
 xlsx_file_name
 

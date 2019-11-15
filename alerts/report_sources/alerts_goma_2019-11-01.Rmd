@@ -537,9 +537,9 @@ current database date.
 
 ```{r subset_21_days}
 
-start_date <- database_date - 20
-x_recent <- filter(x, date >= start_date)
-outcomes_recent <- filter(outcomes, date >= start_date)
+start_date <- database_date - 21
+x_recent <- filter(x, date > start_date)
+outcomes_recent <- filter(outcomes, date > start_date)
 
 ```
 
@@ -564,6 +564,7 @@ less_100 <- x %>% count(zone_de_sante,
 less_100[less_100 %in% greater_100] <- NA
 less_100 <- less_100[complete.cases(less_100)]
 
+
 greater_20_recent <- x_recent %>% count(zone_de_sante,
                aire_de_sante) %>% 
   filter(n >= 20) %>% 
@@ -575,7 +576,8 @@ less_20_recent <- x_recent %>% count(zone_de_sante,
 
 less_20_recent[less_20_recent %in% greater_20_recent] <- NA
 less_20_recent <- less_20_recent[complete.cases(less_20_recent)]
-  
+
+   
 ```
 
 <!-- ======================================================= -->
@@ -676,7 +678,8 @@ ggplot(x_recent, aes(x = date, fill = status)) +
   scale_validations + 
   labs(x = "",
        y = "Nombre d'alertes par jour",
-       title = paste0("Nombre d'alertes par statut de validation - Goma")) +
+       title = paste0("Nombre d'alertes par statut de validation - Goma"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   scale_weeks +
@@ -720,7 +723,7 @@ ggplot(x_prop, aes(x = epiweek_report_label, col = "#D56F3E")) +
   ylim(c(0, 100)) +
   labs(x = "",
        y = "Pourcentage d'alertes validées \npar semaine",
-       title = paste0("Proportion d'alertes validées par semaine - Goma")) +
+       title = paste0("Proportion d'alertes validées - Goma")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -742,7 +745,7 @@ ggplot(x, aes(x = top_zones, fill = status)) +
   scale_validations +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par statut de validation et \nzone de santé") +
+       title = "Nombre d'alertes par statut de validation et \nzone de santé - Goma") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -777,7 +780,7 @@ ggplot(x, aes(x = date, fill = status)) +
                       " et zone de santé - Goma")) +
   large_txt +
   rotate_x_text(45) +
-  theme(legend.position = "bottom") +
+  theme(legend.position = "bottom", strip.text = element_text(size=17)) +
   scale_months
 
 ```
@@ -811,9 +814,8 @@ ggplot(x_recent, aes(x = top_zones, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes",
        title = paste("Nombre d'alertes par statut de validation",
-                     "et \nzone de santé",
-                     " depuis les 3 semaines dernières")) +
-  theme(legend.position = "bottom") +
+                     "et \nzone de santé - Goma"),
+      subtitle = "Données des 3 dernières semaines ") +  theme(legend.position = "bottom") +
   large_txt 
 
 ```
@@ -844,10 +846,11 @@ ggplot(x_recent, aes(x = date, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par statut de validation ",
-                      "et zone de sante - Goma")) +
+                      "et zone de sante - Goma"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
-  theme(legend.position = "bottom") +
+  theme(legend.position = "bottom", strip.text = element_text(size=17)) +
   scale_weeks
 
 ```
@@ -888,7 +891,7 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par statut de validation et aire de santé",
+       title = "Nombre d'alertes par statut de validation et aire de santé - Goma",
        subtitle = "avec plus de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
@@ -912,7 +915,7 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par statut de validation et aire de santé",
+       title = "Nombre d'alertes par statut de validation et aire de santé - Goma",
        subtitle = "avec moins de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
@@ -946,7 +949,7 @@ ggplot(x, aes(x = epiweek_report_label, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
        title = paste0("Nombre d'alertes par statut de validation",
-                      " et aire de sante - Goma")) +
+                      " \net aire de santé - Goma")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -980,7 +983,6 @@ Graphs are split by greater or less than 20 alerts removed all are kept in table
 ```{r health_area_total_recent_greater20, fig.width = 14}
 
 x_validations <- x_recent %>%
-  filter(date > start_date) %>%
   count(status, zone_de_sante, aire_de_sante) %>%
   filter(aire_de_sante %in% greater_20_recent)  
 
@@ -995,8 +997,8 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes",
        title = paste("Nombre d'alertes par statut de validation et aire de santé",
-                     " depuis les 3 semaines dernières"),
-        subtitle = "avec plus de 20 alertes") +
+                     "\n(avec plus de 20 alertes) - Goma"),
+        subtitle = "Données des 3 dernières semaines") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1008,7 +1010,6 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
 ```{r health_area_total_recent_less20, fig.width = 14}
 
 x_validations <- x_recent %>%
-  filter(date > start_date) %>%
   count(status, zone_de_sante, aire_de_sante) %>%
   filter(aire_de_sante %in% less_20_recent)
 
@@ -1023,8 +1024,8 @@ ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes",
        title = paste("Nombre d'alertes par statut de validation et aire de santé",
-                     " depuis les 3 semaines dernières"),
-        subtitle = "avec moins de 20 alertes") +
+                     "\n(avec moins de 20 alertes) - Goma"),
+        subtitle = "Données des 3 dernières semaines") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1051,8 +1052,7 @@ table_ha_total_recent_validation %>%
 
 ```{r health_area_time_recent, fig.width = 12, fig.height = 8}
 
-x_validations <- x %>%
-  filter(date > start_date) %>%
+x_validations <- x_recent %>%
   filter(top_aires != "other") %>%
   count(date, status, top_aires)
 
@@ -1063,7 +1063,8 @@ ggplot(x_validations, aes(x = date, y = n, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par statut de validation",
-                      " et aire de sante - Goma")) +
+                      " et aire de santé - Goma"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1117,7 +1118,7 @@ ggplot(x, aes(x = epiweek_report_label, fill = origin)) +
   guides(fill = guide_legend(ncol = 2)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
-       title = "Nombre d'alertes par origine et par semaine") +
+       title = "Nombre d'alertes par origine - Goma") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45) +
@@ -1156,7 +1157,8 @@ ggplot(x_recent, aes(x = date, fill = origin)) +
   large_txt +
   theme(legend.position = "bottom",
         panel.spacing.y = unit(1, "lines")) +
-  labs(title = "Nombre d'alertes par origine et par semaine",
+  labs(title = "Nombre d'alertes par origine - Goma",
+       subtitle = "Données des 3 dernières semaines ",
        x = "",
        y = "Nombre d'alertes par jour") +
   scale_weeks
@@ -1191,7 +1193,7 @@ ggplot(x, aes(x = top_zones, fill = origin)) +
   guides(fill = guide_legend(ncol = 2)) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par origine et zone de santé") +
+       title = "Nombre d'alertes par origine et zone de santé - Goma") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1222,7 +1224,7 @@ ggplot(x, aes(x = date, fill = origin)) +
   scale_origins + 
   labs(x = "",
        y = "Nombre d'alertes par semaine",
-       title = paste0("Nombre d'alertes par origin de validation ",
+       title = paste0("Nombre d'alertes par origine de validation ",
                       "et zone de santé - Goma")) +
   large_txt +
   rotate_x_text(45) +
@@ -1259,8 +1261,8 @@ ggplot(x_recent, aes(x = top_zones, fill = origin)) +
   guides(fill = guide_legend(ncol = 2)) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = paste("Nombre d'alertes par origine et zone de santé depuis\n", 
-                     "les 3 semaines dernières")) +
+       title = paste("Nombre d'alertes par origine et zone de santé - Goma"), 
+        subtitle = "Données des 3 dernières semaines ") +
   theme(legend.position = "bottom") +
   large_txt 
 
@@ -1292,7 +1294,8 @@ ggplot(x_recent, aes(x = date, fill = origin)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par origine",
-                      "et zone de sante - Goma")) +
+                      "et zone de santé - Goma"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1337,7 +1340,7 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par origine et aire de santé",
+       title = "Nombre d'alertes par origine et aire de santé - Goma",
        subtitle = "avec plus de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
@@ -1363,7 +1366,7 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par origine et aire de santé",
+       title = "Nombre d'alertes par origine et aire de santé - Goma",
        subtitle = "avec moins de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
@@ -1401,7 +1404,7 @@ ggplot(x_origins, aes(x = epiweek_report_label, fill = origin)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
        title = paste0("Nombre d'alertes par origine",
-                      " et zone de sante - Goma")) +
+                      " et zone de santé - Goma")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1434,7 +1437,6 @@ Graphs are split by greater or less than 20 alerts removed all are kept in table
 ``` {r health_area_total_recent_origin_greater20, fig.width = 14}
 
 x_origins <- x_recent %>%
-  filter(date > start_date) %>%
   count(origin, zone_de_sante, aire_de_sante) %>%
   filter(aire_de_sante %in% greater_20_recent)
 
@@ -1448,8 +1450,8 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
   labs(x = "",
        y = "Nombre d'alertes",
        title = paste("Nombre d'alertes par origine et aire de santé",
-                     "\ndepuis les 3 semaines dernières"),
-       subtitle = "avec plus de 20 alertes") +
+                     "\n(avec plus de 20 alertes) - Goma"),
+       subtitle = "Données des 3 dernières semaines ") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1461,7 +1463,6 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
 ``` {r health_area_total_recent_origin_less20, fig.width = 14}
 
 x_origins <- x_recent %>%
-  filter(date > start_date) %>%
   count(origin, zone_de_sante, aire_de_sante) %>%
   filter(aire_de_sante %in% less_20_recent)  
 
@@ -1475,8 +1476,8 @@ ggplot(x_origins, aes(x = aire_de_sante, y = n, fill = origin)) +
   labs(x = "",
        y = "Nombre d'alertes",
        title = paste("Nombre d'alertes par origine et aire de santé",
-                     "\ndepuis les 3 semaines dernières"),
-       subtitle = "avec moins de 20 alertes") +
+                     "\n(avec moins de 20 alertes) - Goma"),
+       subtitle = "Données des 3 dernières semaines ") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1504,8 +1505,7 @@ table_ha_total_recent_origins %>%
 ```{r health_area_time_recent_origin, fig.width = 12, fig.height = 8}
 
 x_origins_recent <- x_recent %>%
-  filter(top_aires != "other",
-         date > start_date) %>%
+  filter(top_aires != "other") %>%
   count(date, origin, top_aires) 
 
 ggplot(x_origins_recent, aes(x = date, y = n, fill = origin)) +
@@ -1515,7 +1515,8 @@ ggplot(x_origins_recent, aes(x = date, y = n, fill = origin)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par origine",
-                      " et aire de santé - Goma")) +
+                      " et aire de santé - Goma"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1581,7 +1582,7 @@ ggplot(outcomes, aes(x = epiweek_report_label, fill = decision_comparison)) +
   scale_x_discrete(drop = FALSE) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par décision de validation") +
+       title = "Nombre d'alertes par décision de validation - Goma") +
   theme(legend.position = "bottom") +
   large_txt +
   scale_decisions +
@@ -1665,7 +1666,8 @@ ggplot(outcomes_recent, aes(x = date, fill = decision_comparison)) +
   large_txt +
   scale_decisions +
   theme(legend.position = "bottom") +
-  labs(title = paste("Nombre d'alertes par décision de validation"),
+  labs(title = paste("Nombre d'alertes par décision de validation - Goma"),
+       subtitle = "Données des 3 dernières semaines",
        x = "",
        y = "Nombre d'alertes par jour") +
   scale_weeks
@@ -1700,7 +1702,7 @@ ggplot(outcomes, aes(x = top_zones, fill = decision_comparison)) +
   scale_decisions +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par décision et zone de santé") +
+       title = paste("Nombre d'alertes par décision de validation", "\n et zone de santé - Goma")) +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1767,8 +1769,8 @@ ggplot(outcomes_recent, aes(x = top_zones, fill = decision_comparison)) +
   scale_decisions +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = paste("Nombre d'alertes par décision et zone de santé depuis",
-                     "\nles 3 semaines dernières")) +
+       title = paste("Nombre d'alertes par décision de validation ", " \net zone de santé - Goma"),
+        subtitle = "Données des 3 dernières semaines ") +
   theme(legend.position = "bottom") +
   large_txt
 
@@ -1799,7 +1801,8 @@ ggplot(outcomes_recent, aes(x = date, fill = decision_comparison)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par décision de validation ",
-                      "et zone de sante - Goma")) +
+                      "et zone de santé - Goma"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1845,7 +1848,7 @@ ggplot(x_decisions,
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par décision de validation et aire de santé",
+       title = paste("Nombre d'alertes par décision de validation", " \net aire de santé - Goma"),
        subtitle = "avec plus de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
@@ -1870,7 +1873,7 @@ ggplot(x_decisions,
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = "Nombre d'alertes par décision de validation et aire de santé",
+       title = paste("Nombre d'alertes par décision de validation", " \net aire de santé - Goma"),
        subtitle = "avec moins de 100 alertes") +
   theme(legend.position = "bottom") +
   large_txt +
@@ -1908,7 +1911,7 @@ ggplot(x_decisions, aes(x = epiweek_report_label, fill = decision_comparison)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
        title = paste0("Nombre d'alertes par décision de validation",
-                      " et aire de sante - Goma")) +
+                      " et aire de santé - Goma")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1941,7 +1944,6 @@ Graphs are split by greater or less than 20 alerts removed all are kept in table
 ```{r health_area_total_recent_decision_greater20, fig.width = 14}
 
 x_decisions <- outcomes_recent %>%
-  filter(date > start_date) %>%
   count(decision_comparison, zone_de_sante, aire_de_sante) %>%
   filter(aire_de_sante %in% greater_20_recent)  
 
@@ -1955,9 +1957,8 @@ ggplot(x_decisions,
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = paste("Nombre d'alertes par décision de validation et aire de santé",
-                     "\ndepuis les 3 semaines dernières"),
-       subtitle = "avec plus de 20 alertes") +
+       title = paste("Nombre d'alertes par décision de validation", " \net aire de santé (avec plus de 20 alertes) - Goma"),
+       subtitle = "Données des 3 dernières semaines") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -1968,7 +1969,6 @@ ggplot(x_decisions,
 ```{r health_area_total_recent_decision_less20, fig.width = 14}
 
 x_decisions <- outcomes_recent %>%
-  filter(date > start_date) %>%
   count(decision_comparison, zone_de_sante, aire_de_sante) %>%
   filter(aire_de_sante %in% less_20_recent)    
 
@@ -1982,9 +1982,8 @@ ggplot(x_decisions,
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes",
-       title = paste("Nombre d'alertes par décision de validation et aire de santé",
-                     "\ndepuis les 3 semaines dernières"),
-       subtitle = "avec moins de 20 alertes") +
+       title = paste("Nombre d'alertes par décision de validation", " \net aire de santé (avec moins de 20 alertes) - Goma"),
+       subtitle = "Données des 3 dernières semaines") +
   theme(legend.position = "bottom") +
   large_txt +
   rotate_x_text(45)
@@ -2022,7 +2021,8 @@ ggplot(x_decisions_recent, aes(x = date, fill = decision_comparison)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par décision de validation",
-                      " et aire de santé - Goma")) +
+                      " et aire de santé - Goma"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2036,7 +2036,6 @@ ggplot(x_decisions_recent, aes(x = date, fill = decision_comparison)) +
 ```{r table_ha_over_time_recent_decisions}
 
 table_ha_over_time_recent_decisions <- outcomes_recent %>%
-  filter(date > start_date) %>%
   count(date, top_aires, decision_comparison) %>%
   spread(decision_comparison, n, fill = 0) %>%
   adorn_totals(where = c("row", "col"))
@@ -2093,8 +2092,7 @@ ggplot(data = x_alert_rate_sous_co,
   scale_validations + 
   labs(x = "",
        y = "Nombre d'alertes par semaine \net par 10,000 personnes",
-       title = paste0("Nombre d'alertes par 10000 personnes pour \n", 
-                      "le sous-coordination de Goma")) +
+       title = paste0("Nombre d'alertes par 10000 personnes -  Goma")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2141,8 +2139,8 @@ ggplot(data = x_alert_rate_sous_co, aes(x = date,
   scale_validations + 
   labs(x = "",
        y = "Nombre d'alertes par jour \net par 10,000 personnes",
-       title = paste0("Nombre d'alertes par 10000 personnes pour \n", 
-                      "le sous-coordination de Goma")) +
+       title = paste0("Nombre d'alertes par 10000 personnes -  Goma"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2195,7 +2193,7 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = zone_de_sante,
   labs(x = "",
        y = "Nombre d'alertes par semaine \net par 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
-                      "de validation et zone de santé")) +
+                      "de validation et zone de santé - Goma")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom")
@@ -2221,7 +2219,7 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = epiweek_report_label,
   labs(x = "",
        y = "Nombre d'alertes par semaine \net par 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
-                      "de validation, et zone de santé")) +
+                      "de validation, et zone de santé - Goma")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2238,7 +2236,7 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = epiweek_report_label,
 ``` {r alert_rate_zone_de_sante_weekly_validation_status_recent}
 
 x_alert_rate_zone_sante <- x %>%
-  filter(date > start_date,
+  filter(
          as_population > 0,
          top_zones != "other") %>% 
   count(status, top_zones, zs_population) %>%
@@ -2251,8 +2249,8 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = top_zones,
   labs(x = "",
        y = "Nombre d'alertes par semaine \net par 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
-                      "de validation et zone de santé depuis le 3 semaines", 
-                      " \ndernières")) +
+                      "de validation et zone de santé - Goma"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   theme(legend.position = "bottom") 
 
@@ -2278,7 +2276,8 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = date,
   labs(x = "",
        y = "Nombre d'alertes par jour \net par 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
-                      "de validation et zone de santé")) +
+                      "de validation et zone de santé - Goma"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2313,7 +2312,7 @@ ggplot(data = x_alert_rate_zone_sante, aes(x = aire_de_sante,
   labs(x = "",
        y = "Nombre d'alertes par semaine \net par 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes par statut ", 
-                      "de validation et aire de santé")) +
+                      "de validation et aire de santé - Goma")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") 
@@ -2339,7 +2338,7 @@ ggplot(data = x_alert_rate_aire_sante, aes(x = epiweek_report_label,
   labs(x = "",
        y = "Nombre d'alertes par semaine et \npar 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes par statut", 
-                      " de validation et aire de santé")) +
+                      " de validation et aire de santé - Goma")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2354,7 +2353,6 @@ ggplot(data = x_alert_rate_aire_sante, aes(x = epiweek_report_label,
 
 x_alert_rate_aire_sante_recent <- x_recent %>%
   filter(top_zones != "other",
-         date > start_date,
          as_population > 0) %>%
   count(status, aire_de_sante, top_zones, as_population) %>%
   mutate(alert_rate = (10000 * n) / (as_population * 3)) 
@@ -2368,8 +2366,8 @@ ggplot(data = x_alert_rate_aire_sante_recent, aes(x = aire_de_sante,
         strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
   labs(x = "",
        y = "Nombre d'alertes par 10000 \npersonnes et par semaine",
-       title = paste0("Nombre d'alertes par 10000 personnes et par semaine", 
-                      "\npour les 3 semaines dernières")) +
+       title = paste0("Nombre d'alertes par 10000 personnes - Goma"), 
+        subtitle = "Données des 3 dernières semaines ") + 
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") 
@@ -2381,8 +2379,8 @@ ggplot(data = x_alert_rate_aire_sante_recent, aes(x = aire_de_sante,
 
 ``` {r alert_rate_aire_de_sante_recent, fig.width = 12, fig.height = 8}
 
-x_alert_rate_aire_sante <- x %>%
-  filter(date > start_date,
+x_alert_rate_aire_sante <- x_recent %>%
+  filter(
          top_aires != "other",
          as_population > 0) %>%
   count(date, status, top_aires, as_population) %>%
@@ -2396,7 +2394,8 @@ ggplot(data = x_alert_rate_aire_sante, aes(x = date,
   labs(x = "",
        y = "Nombre d'alertes par jour et \npar 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes par statut", 
-                      " de validation et aire de santé")) +
+                      " de validation et aire de santé - Goma"),
+       subtitle = "Données des 3 dernières semaines ") +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
