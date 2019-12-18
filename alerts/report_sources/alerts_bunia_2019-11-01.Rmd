@@ -1,6 +1,6 @@
 ---
-title: "Investigation of alerts data: Goma"
-author: "Charlie Whittaker, Christopher Jarvis,  Thibaut Jombart, Flavio Finger, Jonathan Polonsky, Patrick Keating, and Amy Gimma for the analytic cell OEC Goma"
+title: "Investigation of alerts data: Bunia"
+author: "Charlie Whittaker, Christopher Jarvis,  Thibaut Jombart, Flavio Finger, Jonathan Polonsky, Patrick Keating, and Amy Gimma for the analytic cell OEC Bunia"
 date: "`r format(Sys.time(), '%A %d %B %Y')`"
 output:
   html_document: 
@@ -57,7 +57,7 @@ broken.** To make a contribution, carefully read the
 <!-- ======================================================= -->
 ## Outline
 
-This report cleans and analyses the alert data of Goma. Input comes from an
+This report cleans and analyses the alert data of Bunia. Input comes from an
 `xlsx` file containing alerts in a specific format. Because all
 sub-coordinations have different standards, each sub-coordination needs a
 separate report.
@@ -106,12 +106,12 @@ We extract the completion date from the file name:
 ```{r load_alerts_data}
 
 ## load the data
-current_goma
-x_raw <- custom_import(current_goma)
+current_bunia
+x_raw <- custom_import(current_bunia)
 glimpse(x_raw)
 
 ## extract database date from the file name
-file_name <- gsub("^[^.]+/", "", current_goma)
+file_name <- gsub("^[^.]+/", "", current_bunia)
 database_date <- file_name %>%
   guess_dates()
 database_date
@@ -218,7 +218,7 @@ was reported in.
 - `top_zones` - which describes the 3 most active Zone de Santes (other Zone de 
 Santes) are grouped into "other".
 - `top_aires` - which describes the 14 most active Aire de Santes (out of all the
-legitimate Aire de Santes belonging to Goma present in the database). Note - All 
+legitimate Aire de Santes belonging to Bunia present in the database). Note - All 
 other Aire de Santes are aggregated into the category "other".
 
 Note - All other Aire de Santes are aggregated into the category "other".
@@ -314,7 +314,7 @@ unknown_as_3weeks <- x %>%
 ```
 
 
-There are `r nrow(unknown_as)` unknown aire de santes with the latest being `r most_recent_unknown_as`. There are `r nrow(unknown_as_3weeks)` alerts in the last 3 weeks with an unknown aire de santes in the database.
+There are `r nrow(unknown_as)` alerts with unknown aire de santes with the latest being `r most_recent_unknown_as`. There are `r nrow(unknown_as_3weeks)` alerts in the last 3 weeks with an unknown aire de santes in the database.
 
 ```{r show_unknown_area_names}
 
@@ -407,8 +407,8 @@ prop_linked <- sum(number_individuals_aire_linked / number_individuals)
 table(x$aire_de_sante[is.na(x$as_population)]) # aire de santes in database we're not matching
 
 # Identifying Aire de Santes with missing population data
-goma_ha_pop <- pop_data$population
-index <- which(is.na(goma_ha_pop))
+bunia_ha_pop <- pop_data$population
+index <- which(is.na(bunia_ha_pop))
 non_pop_data <- pop_data$aire_de_sante[index]
 
 # Identifying number of alerts linked to Aire de Sante with 
@@ -537,9 +537,9 @@ current database date.
 
 ```{r subset_21_days}
 
-start_date <- database_date - 20
-x_recent <- filter(x, date >= start_date)
-outcomes_recent <- filter(outcomes, date >= start_date)
+start_date <- database_date - 21
+x_recent <- filter(x, date > start_date)
+outcomes_recent <- filter(outcomes, date > start_date)
 
 ```
 
@@ -610,7 +610,7 @@ ggplot(x, aes(x = date, fill = status)) +
   scale_validations + 
   labs(x = "",
        y = "Nombre d'alertes par semaine",
-       title = paste0("Nombre d'alertes par statut de validation - Goma")) +
+       title = paste0("Nombre d'alertes par statut de validation - Bunia")) +
   large_txt +
   rotate_x_text(45) + 
   scale_months +
@@ -645,7 +645,7 @@ ggplot(x_recent, aes(x = date, fill = status)) +
   scale_validations + 
   labs(x = "",
        y = "Nombre d'alertes par jour",
-       title = paste0("Nombre d'alertes par statut de validation - Goma")) +
+       title = paste0("Nombre d'alertes par statut de validation - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   scale_weeks +
@@ -689,7 +689,7 @@ ggplot(x_prop, aes(x = epiweek_report_label, col = "#D56F3E")) +
   ylim(c(0, 100)) +
   labs(x = "",
        y = "Pourcentage d'alertes validées \npar semaine",
-       title = paste0("Proportion d'alertes validées par semaine - Goma")) +
+       title = paste0("Proportion d'alertes validées par semaine - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -743,7 +743,7 @@ ggplot(x, aes(x = date, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
        title = paste0("Nombre d'alertes par statut de validation ",
-                      " et zone de santé - Goma")) +
+                      " et zone de santé - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -813,7 +813,7 @@ ggplot(x_recent, aes(x = date, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par statut de validation ",
-                      "et zone de sante - Goma")) +
+                      "et zone de sante - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -891,7 +891,7 @@ ggplot(x, aes(x = epiweek_report_label, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
        title = paste0("Nombre d'alertes par statut de validation",
-                      " et aire de sante - Goma")) +
+                      " et aire de sante - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -981,7 +981,7 @@ ggplot(x_validations, aes(x = date, y = n, fill = status)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par statut de validation",
-                      " et aire de sante - Goma")) +
+                      " et aire de sante - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1141,8 +1141,8 @@ ggplot(x, aes(x = date, fill = origin)) +
   scale_origins + 
   labs(x = "",
        y = "Nombre d'alertes par semaine",
-       title = paste0("Nombre d'alertes par origin de validation ",
-                      "et zone de santé - Goma")) +
+       title = paste0("Nombre d'alertes par origine de validation ",
+                      "et zone de santé - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1211,7 +1211,7 @@ ggplot(x_recent, aes(x = date, fill = origin)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par origine de validation ",
-                      "et zone de sante - Goma")) +
+                      "et zone de sante - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1294,7 +1294,7 @@ ggplot(x_origins, aes(x = epiweek_report_label, fill = origin)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
        title = paste0("Nombre d'alertes par statut de validation",
-                      " et zone de sante - Goma")) +
+                      " et zone de sante - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1381,7 +1381,7 @@ ggplot(x_origins_recent, aes(x = date, y = n, fill = origin)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par statut de validation",
-                      " et aire de santé - Goma")) +
+                      " et aire de santé - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1599,7 +1599,7 @@ ggplot(outcomes, aes(x = date, fill = decision_comparison)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
        title = paste0("Nombre d'alertes par décision de validation ",
-                      "et zone de santé - Goma")) +
+                      "et zone de santé - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1666,7 +1666,7 @@ ggplot(outcomes_recent, aes(x = date, fill = decision_comparison)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par décision de validation ",
-                      "et zone de sante - Goma")) +
+                      "et zone de sante - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1750,7 +1750,7 @@ ggplot(x_decisions, aes(x = epiweek_report_label, fill = decision_comparison)) +
   labs(x = "",
        y = "Nombre d'alertes par semaine",
        title = paste0("Nombre d'alertes par décision de validation",
-                      " et aire de sante - Goma")) +
+                      " et aire de sante - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1837,7 +1837,7 @@ ggplot(x_decisions_recent, aes(x = date, fill = decision_comparison)) +
   labs(x = "",
        y = "Nombre d'alertes par jour",
        title = paste0("Nombre d'alertes par décision de validation",
-                      " et aire de santé - Goma")) +
+                      " et aire de santé - Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1911,7 +1911,7 @@ ggplot(data = x_alert_rate_sous_co,
   labs(x = "",
        y = "Nombre d'alertes par semaine \net par 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes pour \n", 
-                      "le sous-coordination de Goma")) +
+                      "la sous-coordination de Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -1955,7 +1955,7 @@ ggplot(data = x_alert_rate_sous_co, aes(x = date,
   labs(x = "",
        y = "Nombre d'alertes par jour \net par 10,000 personnes",
        title = paste0("Nombre d'alertes par 10000 personnes pour \n", 
-                      "le sous-coordination de Goma")) +
+                      "la sous-coordination de Bunia")) +
   large_txt +
   rotate_x_text(45) +
   theme(legend.position = "bottom") +
@@ -2246,7 +2246,7 @@ if (!dir.exists("produced_rds")) {
 
 ## create the text for the file name with the database date
 rds_file_name <- sprintf("%sclean_%s.rds",
-                     undated_file_name(current_goma),
+                     undated_file_name(current_bunia),
                      format(database_date, "%Y-%m-%d"))
 rds_file_name
 
@@ -2288,9 +2288,9 @@ stored inside the folder `produced_xlsx`:
 
 ```{r exports_tables, eval = TRUE}
 
-cleaned_alerts_database_goma <- x
+cleaned_alerts_database_bunia <- x
 
-to_export <- c("cleaned_alerts_database_goma",
+to_export <- c("cleaned_alerts_database_bunia",
                "table_validation_overall_time",
                "table_validation_overall_past_3_weeks",
                "table_hz_total_validation",
@@ -2343,7 +2343,7 @@ We copy the main data file to the `data/clean` folder:
 
 ## create the text for the file name with the database date
 xlsx_file_name <- sprintf("%sclean_%s.xlsx",
-                     undated_file_name(current_goma),
+                     undated_file_name(current_bunia),
                      format(database_date, "%Y-%m-%d"))
 xlsx_file_name
 

@@ -2,10 +2,11 @@
 raw_folder <- here::here("data", "raw")
 
 ## Get the names of the most recent data files
-## current_beni <- get_latest_data("alerts_beni", raw_folder)
-## current_butembo <- get_latest_data("alerts_butembo", raw_folder)
+current_beni <- get_latest_data("^alerts_beni.*.xlsx", raw_folder)
+current_biakato <- get_latest_data("^alerts_biakato.*.xlsx", raw_folder)
+current_butembo <- get_latest_data("^alerts_butembo.*.xlsx", raw_folder)
 ## current_bukavu <- get_latest_data("alerts_bukavu", raw_folder)
-current_goma <- get_latest_data("alerts_goma", raw_folder)
+current_goma <- get_latest_data("^alerts_goma.*.xlsx", raw_folder)
 ## current_mangina <- get_latest_data("alerts_mangina", raw_folder)
 ## current_mambasa <- get_latest_data("alerts_mambasa", raw_folder)
 ## current_bunia <- get_latest_data("alerts_bunia", raw_folder)
