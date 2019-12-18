@@ -1,0 +1,1426 @@
+---
+title: "Investigation of alerts data in all SC: can be used for a deep_dvie in specific ZS "
+author: "Aminata Ndiaye, Christopher Jarvis,  Charlie Whittaker, Thibaut Jombart, Flavio Finger, Jonathan Polonsky, Patrick Keating, and Amy Gimma for the analytic cell OEC Goma"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document: 
+    code_folding: hide
+    highlight: zenburn
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+    toc_collapse: no
+    toc_depth: 1
+    toc_float: yes
+    css: !expr here::here('css', 'style.css')
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      collapse = TRUE,
+                      fig.width = 8,
+                      fig.height = 6, 
+                      dpi = 150,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.path = "figures/")
+```
+
+
+<br>
+
+**Maintainer:** Christopher Jarvis (christopher.jarvis@lshtm.ac.uk)
+
+**Code contributors:** Ndiaye Aminata, Esther Van Kleef, Chris Jarvis, Charlie Whittaker
+
+**Data contributors:** Surveillance team
+
+**Version:** 1.0.0 
+
+**Reviewed by:** 
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+
+<!-- ======================================================= -->
+## Outline
+
+This report takes table exports fom each report of the different SC of interest, merge them in other to make analyses by ZS.
+
+The data preparation involves the following steps, detailed in the following 
+tabs:
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc.
+
+
+## Load scripts
+
+These scripts will load:
+
+* all local scripts, stored as `.R` filesinside `/scripts/`
+* all Overall scripts, i.e. stored outside the factory in `../scripts/`
+
+```{r read_scripts}
+
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$",
+                     full.names = TRUE)
+for (file in scripts_files) source(file, local = TRUE)
+
+ggthemr("fresh")
+
+```
+
+
+<!-- ======================================================= -->
+## Load alerts data
+
+We extract the completion date from the file name:
+
+```{r load_alerts_data}
+#once same var of final_evd_outcome created in all alertsreports, select it from here as well
+
+#load clean data
+clean_beni <- rio::import(current_clean_beni) %>%
+  select(id, date, zone_de_sante, aire_de_sante, origin, status, epiweek_report:total_population) 
+
+clean_biakato <- rio::import(current_clean_biakato)  %>%
+  select(id, date, zone_de_sante, aire_de_sante, origin, status, epiweek_report:total_population) 
+
+clean_bukavu <- rio::import(current_clean_bukavu) %>%
+  select(id, date, zone_de_sante, aire_de_sante, origin, status, epiweek_report:total_population) 
+
+
+clean_bunia <- rio::import(current_clean_bunia) %>%
+  select(id, date, zone_de_sante, aire_de_sante, origin, status, epiweek_report:total_population) 
+
+
+clean_butembo <- rio::import(current_clean_butembo) %>%
+  select(id, date, zone_de_sante, aire_de_sante, origin, status, epiweek_report:total_population) 
+
+
+clean_goma <- rio::import(current_clean_goma) %>%
+  select(id_index, date, zone_de_sante, aire_de_sante, origin, status, epiweek_report:total_population) %>%
+  mutate(id= id_index) %>%
+  select(-id_index)
+
+
+clean_mambasa <- rio::import(current_clean_mambasa)  %>%
+  select(id_index, date, zone_de_sante, aire_de_sante, origin, status, epiweek_report:total_population) %>%
+  mutate(id= id_index) %>%
+  select(-id_index)
+
+
+clean_mangina <- rio::import(current_clean_mangina)  %>%
+  select(id, date,zone_de_sante, aire_de_sante, origin, status, epiweek_report:total_population) 
+
+
+clean_alerts_all <- rbind(clean_beni, clean_biakato, clean_bukavu, clean_bunia,
+                      clean_butembo,  clean_goma, clean_mambasa, clean_mangina )
+
+#Dataset of all combined alerts with the main variables of interest for table and plotting
+
+#saveRDS(clean_alerts_all, file="P:/WORK_WHO/evd_eoc_goma/analysis_infrastructure/routine_analyses/alerts/data/clean/clean_alerts_all_2019-12-11.rds")
+
+
+```
+
+<!-- ======================================================= -->
+## Last 21 days
+
+We duplicate the previous datasets, retaining the 21 days leading up to the most recent
+database date of the different SCs databases.
+
+```{r subset_21_days}
+
+x <- clean_alerts_all
+
+max_database_date <- max(x$date) 
+
+start_date <- max_database_date - 21
+x_recent <- filter(x, date > start_date)
+#outcomes_recent <- filter(outcomes, date > start_date)
+
+```
+
+
+<!-- ======================================================= -->
+## Custom color scales
+
+We define custom colors for some of the variables used in the plots.
+
+```{r scales_fill}
+
+scale_origins <- scale_fill_manual(
+  "Origine",
+  values = c(communautaire = "#ffcc00",
+             recherche_active = "#c3c388",
+             surveillance_passive = "#ff6699",
+             point_entree = "#40bf80",
+             autre = "#668cff",
+             inconnu = "grey",
+             check_cleaning_rules = "grey"))
+
+scale_decisions <- scale_fill_manual(
+    "Décisions",
+    values = c(true_positive = "#94b8b8",
+               true_negative = "#8c8cd9",
+               false_positive = "#ff8080",
+               false_negative = "#b3003b"),
+    labels = c(true_positive = "vrai positif",
+               true_negative = "vrai négatif",
+               false_positive = "faux positif",
+               false_negative = "faux négatif"))
+
+scale_validations <- scale_fill_manual(
+    "Outcome",
+    values = c(statut_inconnu = "#BCB4A4", 
+               validee = "#D56F3E", 
+               invalidee = "#F2C69B"),
+    labels = c(validee = "Validée", 
+               invalidee = "Invalidée", 
+               statut_inconnu = "Statut Inconnu"))
+
+```
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# Validation status {.tabset .tabset-fade .tabset-pills}
+
+<!-- ======================================================= -->
+## Outline
+
+This section summarises alerts over time according to their validation status i.e. whether they were validated or invalidated.
+
+**Note: All known Aire de Santes are reported in tables**
+**the top 14 Aire de Santes are plotted when it comes to plotting over time**
+**(due to space constraints).**
+
+<!-- ======================================================= -->
+## Overall 
+
+### Weekly, since database start
+
+```{r sous_coord_time}
+
+ggplot(x, aes(x = date, fill = status)) +
+  geom_histogram(binwidth = 7, col = "white") +
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par semaine \n",
+       title = "Nombre d'alertes par statut de validation- \ntoutes bases d'alertes aggrégées*",
+        caption = "*bases de données avec date de début et de dernière mise à jour différentes") +
+  large_txt +
+  rotate_x_text(45) + 
+  scale_months +
+  theme(legend.position = "bottom",  plot.caption = element_text(size=8))
+
+```
+
+
+### Table - weekly since database start
+
+```{r sous_coord_time_table, fig.keep = "all"}
+
+table_validation_overall_time <- x %>%
+  count(epiweek_report, status) %>%
+  spread(status, n, fill = 0) %>% 
+  adorn_totals(where = c("row", "col"))
+
+table_validation_overall_time %>%
+ show_table()
+  
+```
+
+<!-- ======================================================= -->
+## Overall past 3 weeks
+
+### Daily, past 3 weeks
+
+```{r sous_coord_recent}
+
+ggplot(x_recent, aes(x = date, fill = status)) +
+  geom_histogram(binwidth = 1, col = "white") +
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par jour\n",
+       title = "Nombre d'alertes par statut de validation- \ntoutes bases d'alertes aggrégées*", 
+subtitle = "Données des trois dernières semaines",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  large_txt +
+  rotate_x_text(45) +
+  scale_weeks +
+  theme(legend.position = "bottom",  plot.caption = element_text(size=8))
+
+```
+
+### Table - daily past 3 weeks 
+
+```{r sous_coord_recent_table, fig.keep = "all"}
+
+table_validation_overall_past_3_weeks <- x_recent %>%
+  count(date, status) %>%
+  spread(status, n, fill = 0) %>% 
+  adorn_totals(where = c("row", "col"))
+
+table_validation_overall_past_3_weeks %>%
+ show_table()
+  
+```
+
+<!-- ======================================================= -->
+## Overall proportion validated
+
+```{r sous_co_proportion_validated}
+
+x_prop <- x %>%
+  count(epiweek_report_label, status) %>%
+  spread(status, n, fill = 0) %>% 
+  mutate(total = invalidee + validee,
+         p   = prop_to_perc(validee / total),
+         lci = prop_ci(validee, total, "lower", TRUE),
+         uci = prop_ci(validee, total, "upper", TRUE)) %>%
+  select(epiweek_report_label, p, lci, uci)
+
+ggplot(x_prop, aes(x = epiweek_report_label, col = "#D56F3E")) +
+  geom_ribbon(aes(ymin = lci, ymax = uci), alpha = 0.2, colour = NA) +
+  geom_point(aes(y = p), size = 2) +
+  geom_line(aes(y = p), size = 1) + 
+  scale_color_discrete(guide = FALSE) +
+  ylim(c(0, 100)) +
+  labs(x = "",
+       y = "Pourcentage d'alertes validées \npar semaine\n",
+       title = paste0("Proportion d'alertes validées- toutes alertes aggrégées*")) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  scale_months
+
+```
+
+
+<!-- ======================================================= -->
+## Health Zone 
+
+### Total since database start
+
+``` {r health_zone_total}
+
+x %>% 
+  filter(top_zones != "other") %>% 
+ggplot(aes(x = top_zones, fill = status)) +
+  geom_bar() +
+  scale_x_discrete(drop = FALSE) +
+  scale_validations +
+  labs(x = "",
+       y = "Nombre d'alertes total\n",
+       title = "Nombre d'alertes par statut de validation et \nzone de santé- toutes bases d'alertes aggrégées*",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  large_txt +
+  rotate_x_text(45)
+
+```
+
+### Table - total since database start  
+
+```{r table_hz_total_validation, fig.keep = "all"}
+
+table_hz_total_validation <- x %>%
+  count(top_zones, status) %>%
+  spread(status, n, fill = 0) %>% 
+  adorn_totals(where = c("row", "col"))
+
+table_hz_total_validation %>%
+ show_table()
+  
+```
+
+### Weekly since database start
+
+```{r health_zone_time, fig.width = 12, fig.height = 8}
+
+x %>% 
+  filter(top_zones != "other") %>% 
+ggplot(aes(x = date, fill = status)) +
+  geom_histogram(binwidth = 7, col = "white") +
+  facet_wrap( ~ top_zones, scale = "free_y") +
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par semaine\n",
+       title = paste0("Nombre d'alertes par statut de validation ",
+                      " \net zone de santé- toutes alertes aggrégées*"),
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  scale_months
+
+```
+
+### Table - weekly since database start
+
+```{r table_hz_over_time_validation, fig.keep = "all"}
+
+table_hz_over_time_validation <- x %>%
+  count(epiweek_report, top_zones, status) %>%
+  spread(status, n, fill = 0) %>%
+  adorn_totals(where = c("row", "col"))
+
+table_hz_over_time_validation %>%
+ show_table()
+  
+```
+
+
+<!-- ======================================================= -->
+## Health Zone - past 3 weeks
+
+### Total past 3 weeks
+
+``` {r health_zone_total_recent}
+
+ggplot(x_recent, aes(x = top_zones, fill = status)) +
+  geom_bar() +
+  scale_x_discrete(drop = FALSE) +
+  scale_validations +
+  labs(x = "",
+       y = "Nombre d'alertes",
+       title = paste("Nombre d'alertes par statut de validation",
+                     "et \nzone de santé- toutes alertes aggrégées*"), 
+subtitle = "Données des trois dernières semaines",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  large_txt +
+  rotate_axes_text(45)
+
+```
+
+### Table - total past 3 weeks
+
+```{r table_hz_total_recent_validation, fig.keep = "all"}
+
+table_hz_total_recent_validation <- x_recent %>%
+  count(top_zones, status) %>%
+  spread(status, n, fill = 0) %>% 
+  adorn_totals(where = c("row", "col"))
+
+table_hz_total_recent_validation %>%
+ show_table()
+  
+```
+
+
+### Daily past 3 weeks 
+
+```{r health_zone_time_recent, fig.width = 12, fig.height = 8}
+
+ggplot(x_recent, aes(x = date, fill = status)) +
+  geom_histogram(binwidth = 1, col = "white") +
+  facet_wrap( ~ top_zones, scale = "free_y") +
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par jour\n",
+       title = paste0("Nombre d'alertes par statut de validation ",
+                      "et zone de santé- toutes alertes aggrégées* "), 
+subtitle = "Données des trois dernières semaines",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  scale_weeks
+
+```
+
+### Table - daily past 3 weeks 
+
+```{r table_hz_over_time_recent_validation, fig.width = 12, fig.height = 5}
+
+table_hz_over_time_recent_validation <- x_recent %>%
+  count(date, top_zones, status) %>%
+  spread(status, n, fill = 0) %>%
+  adorn_totals(where = c("row", "col"))
+
+table_hz_over_time_recent_validation %>%
+ show_table()
+  
+```
+
+<!-- ======================================================= -->
+## Health Area 
+
+### Total since database start
+
+Graphs are split by greater than 1000, between 500 and 1000, and less than 500. Alerts removed from graphs are all kept in table 
+
+```{r health_area_total_greater1000, fig.width = 14}
+
+x_validations <- x %>%
+  count(status, zone_de_sante, aire_de_sante) %>%
+  filter(n>= 1000)
+
+ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
+  geom_col() +
+  scale_x_discrete(drop = FALSE) +
+  scale_validations +
+  facet_grid(. ~ zone_de_sante, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes\n",
+       title = "Nombre d'alertes par statut de validation et \naire de santé- toutes alertes aggrégées*",
+       subtitle = "avec plus de 1000 alertes",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  large_txt +
+  rotate_x_text(45)
+
+
+
+
+```
+
+```{r health_area_total_greater500less1000, fig.width = 14}
+
+x_validations <- x %>%
+  count(status, zone_de_sante, aire_de_sante) %>%
+  filter( n < 1000 & n >= 500)
+
+ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
+  geom_col() +
+  scale_x_discrete(drop = FALSE) +
+  scale_validations +
+  facet_grid(. ~ zone_de_sante, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes\n",
+       title = "Nombre d'alertes par statut de validation et \naire de santé - toutes alertes aggrégées*",
+       subtitle = "entre 500 et 1000 alertes",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  large_txt +
+  rotate_x_text(45)
+
+
+```
+
+
+```{r health_area_total_greater100less500, fig.width = 14}
+
+x_validations <- x %>%
+  count(status, zone_de_sante, aire_de_sante) %>%
+  filter(n < 500 & n >= 100)
+
+ggplot(x_validations, aes(x = aire_de_sante, y = n, fill = status)) +
+  geom_col() +
+  scale_x_discrete(drop = FALSE) +
+  scale_validations +
+  facet_grid(. ~ zone_de_sante, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes\n",
+       title = "Nombre d'alertes par statut de validation et \naire de santé - toutes alertes aggrégées*",
+       subtitle = "entre 100 et 500 alertes",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  large_txt +
+  rotate_x_text(45)
+
+
+```
+
+### Table - total since database start  
+
+```{r table_ha_total_validation, fig.keep = "all"}
+
+table_ha_total_validation <- x %>%
+  count(aire_de_sante, status) %>%
+  spread(status, n, fill = 0) %>% 
+  adorn_totals(where = c("row", "col"))
+
+table_ha_total_validation %>%
+ show_table()
+  
+```
+
+
+### Table - weekly since database start
+
+```{r table_ha_over_time_validation, fig.keep = "all"}
+
+table_ha_over_time_validation <- x %>%
+  count(epiweek_report, top_aires, status) %>%
+  spread(status, n, fill = 0) %>%
+  adorn_totals(where = c("row", "col"))
+
+table_ha_over_time_validation %>%
+ show_table()
+  
+```
+
+
+
+<!-- ======================================================= -->
+## Health Area - past 3 weeks
+
+### Table - total past 3 weeks 
+
+```{r table_ha_total_recent_validation, fig.keep = "all"}
+
+table_ha_total_recent_validation <- x_recent %>%
+  count(aire_de_sante, status) %>%
+  spread(status, n, fill = 0) %>% 
+  adorn_totals(where = c("row", "col"))
+
+table_ha_total_recent_validation %>%
+ show_table()
+  
+```
+
+
+### Table - daily past 3 weeks
+
+```{r table_ha_over_time_recent_validation , fig.width = 12, fig.height = 5}
+
+table_ha_over_time_recent_validation <- x_recent %>%
+  count(date, top_aires, status) %>%
+  spread(status, n, fill = 0) %>%
+  adorn_totals(where = c("row", "col"))
+
+table_ha_over_time_recent_validation %>%
+ show_table()
+  
+```
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# Origins {.tabset .tabset-fade .tabset-pills}
+
+<!-- ======================================================= -->
+## Outline
+
+This section summarises alerts over time according to their origin 
+
+**Note: All known Aire de Santes are reported in tables**
+**the top 14 Aire de Santes are plotted when it comes to plotting over time**
+**(due to space constraints).**
+
+
+
+<!-- ======================================================= -->
+## Overall
+
+### Weekly, since database start
+
+```{r sous_coord_origins}
+
+ggplot(x, aes(x = epiweek_report_label, fill = origin)) +
+  geom_bar() +
+  scale_x_discrete(drop = FALSE) +
+  scale_origins +
+  guides(fill = guide_legend(ncol = 2)) +
+  labs(x = "",
+       y = "Nombre d'alertes par semaine",
+       title = "Nombre d'alertes par origine - toutes alertes aggrégées*",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  large_txt +
+  rotate_x_text(45) +
+  scale_months
+
+```
+
+### Table - weekly since database start
+
+```{r sous_coord_time_table_origins, fig.keep = "all"}
+
+table_origins <- x %>%
+  count(epiweek_report, origin) %>%
+  spread(origin, n, fill = 0) %>%
+  adorn_totals(where = c("row", "col"))
+
+table_origins %>%
+ show_table()
+  
+```
+
+<!-- ======================================================= -->
+## Overall past 3 weeks
+
+### Daily, past 3 weeks
+
+```{r origins_time_recent}
+
+ggplot(x_recent, aes(x = date, fill = origin)) +
+  geom_histogram(binwidth = 1, col = "white") +
+  theme(strip.text.y = element_text(size = 12, angle = 0)) +
+  scale_months +
+  scale_origins +
+  guides(fill = guide_legend(ncol = 2)) +
+  rotate_x_text(45) +
+  large_txt +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8),
+        panel.spacing.y = unit(1, "lines")) +
+  labs(title = "Nombre d'alertes par origine - toutes alertes aggrégées*",
+subtitle = "Données des trois dernières semaines",
+     x = "",
+       y = "Nombre d'alertes par jour",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  scale_weeks
+
+```
+
+### Table - daily past 3 weeks
+
+```{r table_origins_recent, fig.keep = "all"}
+
+table_origins_recent <- x_recent %>%
+  count(date, origin) %>%
+  spread(origin, n, fill = 0) %>%
+  adorn_totals(where = c("row", "col"))
+
+table_origins_recent %>%
+ show_table()
+  
+```
+
+<!-- ======================================================= -->
+## Health Zone 
+
+### Total since database start
+
+``` {r health_zone_total_origin}
+
+ggplot(x, aes(x = top_zones, fill = origin)) +
+  geom_bar() +
+  scale_x_discrete(drop = FALSE) +
+  scale_origins +
+  guides(fill = guide_legend(ncol = 2)) +
+  labs(x = "",
+       y = "Nombre d'alertes\n",
+       title = "Nombre d'alertes par origine et zone de santé - toutes alertes aggrégées*",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  large_txt +
+  rotate_x_text(45)
+
+```
+
+### Table - total since database start  
+
+```{r table_hz_total_origins, fig.keep = "all"}
+
+table_hz_total_origins <- x %>%
+  count(top_zones, origin) %>%
+  spread(origin, n, fill = 0) %>% 
+  adorn_totals(where = c("row", "col"))
+
+table_hz_total_origins %>%
+ show_table()
+  
+```
+
+
+### Table - weekly since database start
+
+```{r table_hz_over_time_origins, fig.keep = "all"}
+
+table_hz_over_time_origins <- x %>%
+  count(epiweek_report, top_zones, origin) %>%
+  spread(origin, n, fill = 0) %>%
+  adorn_totals(where = c("row", "col"))
+
+table_hz_over_time_origins %>%
+ show_table()
+  
+```
+
+<!-- ======================================================= -->
+## Health Zone - Past 3 Weeks
+
+### Total past 3 weeks
+
+``` {r health_zone_total_recent_origin_recent}
+
+ggplot(x_recent, aes(x = top_zones, fill = origin)) +
+  geom_bar() +
+  scale_x_discrete(drop = FALSE) +
+  scale_origins +
+  guides(fill = guide_legend(ncol = 2)) +
+  labs(x = "",
+       y = "Nombre d'alertes",
+       title = paste("Nombre d'alertes par origine et zone de santé - toutes alertes aggrégées*"), 
+subtitle = "Données des trois dernières semaines",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  large_txt +
+    rotate_x_text(45)
+
+
+```
+
+### Table - total past 3 weeks
+
+```{r table_hz_total_recent_origins, fig.keep = "all"}
+
+table_hz_total_recent_origins <- x_recent %>%
+  count(top_zones, origin) %>%
+  spread(origin, n, fill = 0) %>% 
+  adorn_totals(where = c("row", "col"))
+
+table_hz_total_recent_origins %>%
+ show_table()
+  
+```
+
+
+### Daily past 3 weeks 
+
+```{r health_zone_time_recent_origins, fig.width = 12, fig.height = 8}
+
+ggplot(x_recent, aes(x = date, fill = origin)) +
+  geom_histogram(binwidth = 1, col = "white") +
+  facet_wrap( ~ top_zones, scale = "free_y") +
+  scale_origins + 
+  labs(x = "",
+       y = "Nombre d'alertes par jour",
+       title = paste0("Nombre d'alertes par origine ",
+                      "et zone de sante - toutes alertes aggrégées*"), 
+subtitle = "Données des trois dernières semaines",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  scale_weeks 
+
+```
+
+### Table - daily past 3 weeks 
+
+```{r table_hz_over_time_recent_origins, fig.width = 12, fig.height = 5}
+
+table_hz_over_time_recent_origins <- x_recent %>%
+  count(date, top_zones, origin) %>%
+  spread(origin, n, fill = 0) %>%
+  adorn_totals(where = c("row", "col"))
+
+table_hz_over_time_recent_origins %>%
+ show_table()
+  
+```
+
+<!-- ======================================================= -->
+## Health Area 
+
+
+### Table - total since database start  
+
+
+```{r table_ha_total_origins, fig.keep = "all"}
+
+table_ha_total_origins <- x %>%
+  count(aire_de_sante, origin) %>%
+  spread(origin, n, fill = 0) %>% 
+  adorn_totals(where = c("row", "col"))
+
+table_ha_total_origins %>%
+ show_table()
+  
+```
+
+### Table - weekly since database start
+
+```{r table_ha_over_time_origins, fig.keep = "all"}
+
+table_ha_over_time_origins <- x %>%
+  count(epiweek_report, top_aires, origin) %>%
+  spread(origin, n, fill = 0) %>%
+  adorn_totals(where = c("row", "col"))
+
+table_ha_over_time_origins %>%
+ show_table()
+  
+```
+
+
+<!-- ======================================================= -->
+## Health Area - past 3 weeks
+
+
+### Table - Total past 3 weeks 
+
+```{r table_ha_total_recent_origins, fig.keep = "all"}
+
+table_ha_total_recent_origins <- x_recent %>%
+  count(aire_de_sante, origin) %>%
+  spread(origin, n, fill = 0) %>% 
+  adorn_totals(where = c("row", "col"))
+
+table_ha_total_recent_origins %>%
+ show_table()
+  
+```
+
+
+### Table - daily past 3 weeks
+
+```{r table_ha_over_time_recent_origins, fig.width = 12, fig.height = 5}
+
+table_ha_over_time_recent_origins <- x_recent %>%
+  count(date, top_aires, origin) %>%
+  spread(origin, n, fill = 0) %>%
+  adorn_totals(where = c("row", "col"))
+
+table_ha_over_time_recent_origins %>%
+ show_table()
+  
+```
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# Alert Rates {.tabset .tabset-fade .tabset-pills}
+
+## Outline
+
+This section integrates information on the number of alerts with population data to estimate the number of validated/invalidated alerts per 10,000 people.
+
+**Note:** Rate are only calculated for areas with population data.
+
+
+<!-- ======================================================= -->
+## Overall
+
+### Weekly, Since Database Start 
+
+```{r alert_rates}
+
+x_alert_rate_sous_co <- x %>%
+  count(epiweek_report_label, status, total_population) %>%
+  mutate(alert_rate = 10000 * n / total_population) 
+
+ggplot(data = x_alert_rate_sous_co, 
+       aes(x = epiweek_report_label, y = alert_rate, fill = status)) +
+  geom_col() + 
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par semaine \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes - toutes alertes aggrégées*"),
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  scale_months
+
+```
+
+
+### Table - Weekly Since Database Start
+
+```{r table_alert_rates_per_week, fig.keep = "all"}
+
+table_alert_rates_per_week <- x_alert_rate_sous_co %>%
+  select(-alert_rate) %>% 
+  spread(status, n, fill = 0) %>% 
+  mutate(total = invalidee + validee,
+         alert_rate = 10000 * total / total_population,
+         alert_rate = round(alert_rate, 4))
+
+table_alert_rates_per_week %>%
+  show_table()
+
+```
+
+
+<!-- ======================================================= -->
+## Overall Past 3 Weeks
+
+### Daily, Past 3 Weeks 
+
+``` {r alert_rates_recent}
+
+x_alert_rate_sous_co <- x_recent %>%
+  count(date, status, total_population) %>%
+  mutate(alert_rate = 10000 * n / total_population) 
+
+ggplot(data = x_alert_rate_sous_co, aes(x = date, 
+                                        y = alert_rate, fill = status)) +
+  geom_col() + 
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par jour \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes - toutes alertes aggrégées*"), 
+subtitle = "Données des trois dernières semaines",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  scale_weeks
+
+```
+
+### Table - Weekly Since Database Start
+
+```{r table_alert_rates_recent, fig.keep = "all"}
+
+table_alert_rates_recent <- x_alert_rate_sous_co %>%
+  select(-alert_rate) %>% 
+  spread(status, n, fill = 0) %>% 
+  mutate(total = invalidee + validee,
+         alert_rate = 10000 * total / total_population,
+         alert_rate = round(alert_rate, 4))
+
+table_alert_rates_recent %>%
+ show_table()
+  
+```
+
+
+<!-- ======================================================= -->
+## Health Zone
+
+### Total, Since Database Start
+
+``` {r alert_rate_zone_de_sante_total_validation_status}
+
+date_span <- database_date - min(x$date, na.rm = TRUE)
+number_weeks <- as.numeric(date_span/7)
+
+x_alert_rate_zone_sante <- x %>%
+  filter(top_zones != "other",
+         zs_population > 0) %>%
+  count(status, zone_de_sante, zs_population) %>%
+  mutate(alert_rate = 10000 * n / (zs_population * number_weeks))
+
+ggplot(data = x_alert_rate_zone_sante, aes(x = zone_de_sante, 
+                                           y = alert_rate, fill = status)) +
+  geom_col() +
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par semaine \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
+                      "de validation et zone de santé - toutes alertes aggrégées*"),
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8))
+
+
+```
+
+### Weekly, Since Database Start
+
+``` {r alert_rate_zone_de_sante_weekly_status, fig.height = 5, fig.width = 10}
+
+x_alert_rate_zone_sante <- x %>%
+  filter(top_zones != "other",
+         zs_population > 0) %>%
+  count(epiweek_report_label, status, top_zones, zs_population) %>%
+  mutate(alert_rate = 10000 * n / zs_population)
+
+ggplot(data = x_alert_rate_zone_sante, aes(x = epiweek_report_label, 
+                                           y = alert_rate, fill = status)) +
+  geom_col() +
+  facet_wrap( ~ top_zones) +
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par semaine \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
+                      "de validation, et zone de santé - toutes alertes aggrégées*"),
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  scale_x_date(date_breaks = "2 month", date_labels =  "%b") 
+ 
+```
+
+
+<!-- ======================================================= -->
+## Health Zone Past 3 Weeks
+
+### Total, Past 3 Weeks
+
+``` {r alert_rate_zone_de_sante_weekly_validation_status_recent}
+
+x_alert_rate_zone_sante <- x_recent %>%
+  filter(
+         as_population > 0,
+         top_zones != "other") %>% 
+  count(status, top_zones, zs_population) %>%
+  mutate(alert_rate = 10000 * n / (zs_population * 3))
+
+ggplot(data = x_alert_rate_zone_sante, aes(x = top_zones, 
+                                           y = alert_rate, fill = status)) +
+  geom_col() +
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par semaine \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
+                      "de validation et zone de santé - toutes alertes aggrégées*"), 
+subtitle = "Données des trois dernières semaines",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  large_txt +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  rotate_x_text(45)
+
+
+```
+
+### Daily, Past 3 Weeks
+
+``` {r alert_rate_zone_de_sante_daily_status, fig.height = 5, fig.width = 12}
+
+x_alert_rate_zone_sante <- x_recent %>%
+  filter(
+         zs_population > 0,
+         top_zones != "other") %>%
+  count(date, status, top_zones, zs_population) %>%
+  mutate(alert_rate = 10000 * n / zs_population)
+
+ggplot(data = x_alert_rate_zone_sante, aes(x = date, 
+                                           y = alert_rate, fill = status)) +
+  geom_col() +
+  facet_wrap( ~ top_zones) +
+  scale_validations + 
+  labs(x = "",
+       y = "Nombre d'alertes par jour \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes par statut\n", 
+                      "de validation et zone de santé - toutes alertes aggrégées*"), 
+subtitle = "Données des trois dernières semaines",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) +
+  scale_weeks
+
+```
+
+
+<!-- ======================================================= -->
+## Health Area
+
+### Total, Since Database Start
+
+``` {r alert_rate_aire_de_sante_weekly_val_total, fig.width = 14}
+
+date_span <- database_date - min(x$date)
+number_weeks <- as.numeric(date_span/7)
+
+x_alert_rate_zone_sante <- x %>%
+  filter(top_zones != "other",
+         as_population > 0) %>%
+  count(status, top_zones, aire_de_sante, as_population) %>%
+  mutate(alert_rate = 10000 * n / (as_population * number_weeks))
+
+ggplot(data = x_alert_rate_zone_sante, aes(x = aire_de_sante, 
+                                           y = alert_rate, fill = status)) +
+  geom_col() +
+  scale_validations + 
+  facet_grid(. ~ top_zones, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes par semaine \net par 10,000 personnes",
+       title = paste0("Nombre d'alertes par 10000 personnes par statut ", 
+                      "de validation et aire de santé - toutes alertes aggrégées*",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes")) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) 
+
+
+```
+
+
+<!-- ======================================================= -->
+## Health Area - Past 3 Weeks 
+
+``` {r alert_rate_as_3_weeks, fig.width = 14}
+
+x_alert_rate_aire_sante_recent <- x_recent %>%
+  filter(top_zones != "other",
+         as_population > 0) %>%
+  count(status, aire_de_sante, top_zones, as_population) %>%
+  mutate(alert_rate = (10000 * n) / (as_population * 3)) 
+
+ggplot(data = x_alert_rate_aire_sante_recent, aes(x = aire_de_sante, 
+                                                  y = alert_rate, fill = status)) +
+  geom_col() +
+  scale_validations +
+  facet_grid(. ~ top_zones, scales = "free_x", space = "free") +
+  theme(strip.text.x = element_text(size = 12, angle = 0, color = "#5c8a8a"),
+        strip.background = element_rect(fill = "#e0ebeb", color = "#5c8a8a")) +
+  labs(x = "",
+       y = "Nombre d'alertes par 10000 \npersonnes et par semaine",
+       title = paste0("Nombre d'alertes par 10000 personnes et par semaine - toutes alertes aggrégées*"), 
+subtitle = "Données des trois dernières semaines",
+caption =  "*bases de données avec date de début et de dernière mise à jour différentes") +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom", plot.caption = element_text(size=8)) 
+
+```
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# Export data and tables  {.tabset .tabset-fade .tabset-pills}
+
+
+```{r reactivate_recent, include = FALSE}
+knitr::opts_chunk$set(eval = TRUE)
+```
+
+<!-- ======================================================= -->
+## Outline
+
+We export the clean data to the clean data folder and some of the relevant tables, which will be placed in the current
+working directory.
+
+
+
+<!-- ======================================================= -->
+## Export clean data
+
+We export some of the clean database, placed in `produced_rds/` as well as in
+`data/clean/`:
+
+```{r export_rds, eval = TRUE}
+
+## check if a directory exists and if not then creates it
+if (!dir.exists("produced_rds")) {
+  dir.create("produced_rds")
+}
+
+## create the text for the file name with the database date
+rds_file_name <- sprintf("%sclean_%s.rds", "alerts_all_",
+                     format(database_date, "%Y-%m-%d"))
+rds_file_name
+
+## save the rds file in the produced_rds folder
+rio::export(x,
+            file.path("produced_rds", rds_file_name))
+
+```
+
+We copy these files to the `data/clean` folder:
+
+```{r copy_rds, eval = TRUE}
+# copy some files into `data/clean/`
+
+if (!dir.exists("data/clean")) {
+  dir.create("data/clean")
+}
+
+# Provide the destination of where to copy the data
+destination <- here("data",
+                    "clean",
+                    rds_file_name)
+# Copy the rds data
+file.copy(from = file.path("produced_rds", rds_file_name),
+          to = destination,
+          overwrite = TRUE)
+
+```
+
+
+
+<!-- ======================================================= -->
+## Excel files
+
+The following code exports all tables named in `to_report` to `xslx` files,
+stored inside the folder `produced_xlsx`:
+
+### Cleaned alerts database
+
+```{r exports_tables, eval = TRUE}
+
+cleaned_alerts_database_all <- x
+
+to_export <- c("cleaned_alerts_database_all",
+               "table_validation_overall_time",
+               "table_validation_overall_past_3_weeks",
+               "table_hz_total_validation",
+               "table_hz_over_time_validation",
+               "table_hz_total_recent_validation",
+               "table_hz_over_time_recent_validation",
+               "table_ha_total_validation",
+               "table_ha_over_time_validation",
+               "table_ha_total_recent_validation",
+               "table_ha_over_time_recent_validation",
+               "table_origins",
+               "table_origins_recent",
+               "table_hz_total_origins",
+               "table_hz_over_time_origins",
+               "table_hz_total_recent_origins",
+               "table_hz_over_time_recent_origins",
+               "table_ha_total_origins",
+               "table_ha_over_time_origins",
+               "table_ha_total_recent_origins",
+               "table_ha_over_time_recent_origins"
+               )
+               
+```
+
+```{r xlsx_exports, eval = TRUE}
+
+## check if a directory exists and if not then creates it
+if (!dir.exists("produced_xlsx")) {
+  dir.create("produced_xlsx")
+}
+
+for (e in to_export) {
+  rio::export(get(e),
+              file.path("produced_xlsx",
+                        paste0(e, ".xlsx")))
+}
+
+```
+
+
+We copy the main data file to the `data/clean` folder:
+
+```{r export_xlsx, eval = TRUE}
+
+## create the text for the file name with the database date
+xlsx_file_name <- sprintf("%sclean_%s.rds", "alerts_all_",
+                     format(database_date, "%Y-%m-%d"))
+xlsx_file_name
+
+## save the rds file in the produced_rds folder
+rio::export(x,
+            file.path("produced_xlsx", xlsx_file_name))
+
+```
+
+
+```{r copy_xlsx, eval = TRUE}
+# copy some files into `data/clean/`
+
+# Provide the destination of where to copy the data
+destination <- here("data",
+                    "clean",
+                    xlsx_file_name)
+# Copy the rds data
+file.copy(from = file.path("produced_xlsx", xlsx_file_name),
+          to = destination,
+          overwrite = TRUE)
+
+```
+
+
+
+Click on the following links to open the files (only works if the files above
+have been generated and are in the same folder as this document):
+
+
+```{r xlsx_links, results = "asis", eval = TRUE}
+
+for (e in to_export) {
+  txt <- sprintf("- [%s.xlsx](%s.xlsx)",
+                 e,
+                 file.path("produced_xlsx",
+                           e))
+  cat(txt, sep = "\n")
+}
+
+```
+
+
+<!-- ======================================================= -->
+## R objects
+
+The following code exports all tables named in `to_report` to `rds` files,
+stored inside the folder `produced_rds`:
+
+```{r rds_exports, eval = TRUE}
+
+if (!dir.exists("produced_rds")) {
+  dir.create("produced_rds")
+}
+
+for (e in to_export) {
+  rio::export(get(e),
+              file.path("produced_rds",
+                        paste0(e, ".rds")))
+}
+
+```
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+
+# System information {.tabset .tabset-fade .tabset-pills}
+
+<!-- ======================================================= -->
+## Outline
+
+The following information documents the system on which the document was
+compiled.
+
+
+<!-- ======================================================= -->
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+<!-- ======================================================= -->
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+R.version
+```
+
+
+<!-- ======================================================= -->
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+sessionInfo()
+```
+
+<!-- ======================================================= -->
+## Compilation parameters
+
+This shows which parameters were passed through `params` at compilation time:
+
+```{r params}
+params
+```
