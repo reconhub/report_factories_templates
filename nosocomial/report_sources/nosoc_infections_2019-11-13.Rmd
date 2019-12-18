@@ -1,0 +1,1554 @@
+---
+title: "Analysis of nosocomial Infections over time"
+author: "Aminata Ndiaye, Thibaut Jombart and Chris Jarvis for the analytic cell EOC Goma"
+date: "`r format(Sys.time(), '%A %d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: zenburn
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+    toc_collapse: no
+    toc_depth: 2
+    toc_float: yes
+    css: !expr here::here('css', 'style.css')
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      collapse = TRUE,
+                      fig.width = 8,
+                      fig.height = 6,
+                      dpi = 150,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.path = "figures/")
+```
+
+<br>
+
+**Maintainer:** Ndiaye Aminata (ndiay.ami@outlook.com)
+
+**Code contributors:** Thibaut Jombart, Chris Jarvis and Aminata Ndiaye
+
+**Data contributors:** Surveillance team
+
+**Version:** 1.0.0 (only required for routine reports)
+
+**Reviewed by:** recommended, but only required for routine reports
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# Data preparation {.tabset .tabset-fade .tabset-pills}
+
+
+<!-- ======================================================= -->
+## Outline
+
+### Data used
+
+We used the masterlinelist to investigate the nosocomial infections during the outbreak.  Please, until this report is used in the linelist reports, consider putting the latest version of the masterlinelist.rds in ad_hoc_analyses/data/Clean to update this report.
+
+### Method
+
+The data preparation involves the following steps:
+  
+
+
+* **Load scripts**: loads libraries and useful scripts used in the analyses; all
+  `.R` files contained in `scripts` at the root of the factory are automatically
+  loaded
+
+* **Load data**: imports datasets, and may contain some *ad hoc* changes to the
+data such as specific data cleaning (not used in other reports), new variables
+used in the analyses, etc.
+
+* **Clean data**: this section contains *ad hoc* data cleaning, i.e. which is
+  not used in other reports (otherwise cleaning should be done in a dedicated
+  report); this section is also used to create new variables used in the
+  analyses
+
+
+
+<!-- ======================================================= -->
+## Load scripts
+
+These scripts will load:
+
+* all local scripts, stored as `.R` filesinside `/scripts/`
+* all global scripts, i.e. stored outside the factory in `../scripts/`
+* the path to the cleaned VHF data stored as `x`
+
+```{r read_scripts}
+
+## read scripts
+path_to_scripts <- here::here("scripts")
+scripts_files <- dir(path_to_scripts, pattern = ".R$",
+                     full.names = TRUE)
+for (file in scripts_files) source(file, local = TRUE)
+
+```
+
+
+<!-- ======================================================= -->
+## Load data
+
+We extract the completion date from the file name:
+
+```{r load_data}
+
+current_clean_data
+x <- rio::import(current_clean_data)
+
+file_name <- gsub("^[^.]+/", "", current_clean_data)
+database_date <- file_name %>%
+  guess_dates()
+database_date
+
+```
+
+The **completion date** of the database is **`r format(database_date, format =
+"%A %d %b %Y")`**.
+
+
+
+<!-- ====================================================== -->
+## Add new variables
+
+* `top_zones` which retains the top 7 health zones (with
+most cases since the beginning of the outbreak), and pool everything else into
+'others'.
+
+* `top_zones_recent_report` which retains the top 7 health zones with 
+the most cases in the past 21 days by or date of report.
+
+* `top_zones_recent_onset` which retains the top 7 health zones with 
+the most cases in the past 21 days by or date of report.
+
+
+* `nosoc_infection` which retains only confirmed or probable cases which origin was nosocomial. Confirmed and probable cases with mutliple origin (`tranmission_place_group`) are excluded.
+
+* `age_class_large` which uses `age_class` to create much larger age classes for plotting purposes. 
+
+*`hosp1_name` to `hosp6_name` that takes either the FOSA name either add "inconnu_mais_date" to precise that we have a visit date, so even if the name of the FOSA visited is missing, we should count that visit. These variables will be emtpy only if there is no FOSA names and no start or end FOSA visit. 
+
+*`check_date_fosa1` to `check_date_fosa6` that tells when we have a visit date (start or end) whether the visit at that FOSA was before or after the admission in CTE (if available).
+
+*`value_fosa1` to `value_fosa6` that takes 1 if we have a non-mising`hosp1_name` to `hosp6_name` (including FOSA whith no name but with a date that were renamed: "inconnu_mais_date") and a missing date or a date of FOSA visit before admission to CTE.
+To be more specific, we could also remove records with no date. 
+
+*`decision_num_fosa_vis` sums up the value_fosa_ variables to give the final number of FOSA visited before being admitted to a CTE. In the case where the name of a FOSA is given but neither the date of start nor the date of end, we do not count that visit.
+
+
+
+```{r add_new_variables}
+
+## Major health zones
+## Defined for the entire outbreak, and for the last 21 days
+
+recent_date <- database_date - 21
+recent_report <- x$date_report > recent_date
+recent_onset <- x$date_onset > recent_date
+
+x <- x %>%
+  mutate(top_zones = top_values(zone_de_sante, 6),
+         top_zones_recent_report =
+           top_values(zone_de_sante, 7, subset = recent_report),
+         top_zones_recent_onset =
+           top_values(zone_de_sante, 6, subset = recent_onset))
+
+
+## force level order for transmission place
+levels(x$transmission_place_group) <-  c("multiple", 
+                                         "non_enregistre",
+                                         "communautaire",
+                                         "nosocomial")
+
+## Community death
+x <- x %>% mutate(community_death =
+                    ifelse(type_death == "community", "oui", "non"),
+                  community_death = factor(community_death,
+                                           levels = c("oui", "non")))
+
+## Force levels for contact status
+x <- x %>% mutate(report_status =
+                    factor(report_status,
+                           levels = c("dead", "inconnu", "alive")))
+                  
+
+#Binary variable for possible nosocomial infections
+
+x <- x %>% mutate(nosoc_infection =
+                    ifelse(transmission_place_group == "nosocomial", "oui", "non"),
+                  nosoc_infection = factor(nosoc_infection,
+                                           levels = c("oui", "non")))
+
+
+#age_class for the nosocomial infections
+
+x <- x %>% mutate(age_class_large =
+                    ifelse(age_class %in% c("<=5","unknown"), as.character(age_class), 
+                           ifelse(age_class %in% c("6-10","11-17"),"6-18" , "+18"))) 
+
+#Binary variable for numb of FOSA visited over time
+
+x <- x %>% mutate(num_fosa_vis = 
+                 ifelse(!is.na(number_hcf), number_hcf, "inconnu"))#,
+
+
+
+
+x$hcw_new <- as.factor(x$hcw)
+levels(x$hcw_new) <- c("Personnel de santé", "Autres", "Inconnu")
+
+
+##Create a new variable of number of FOSA visited before going to CTE: number_hcf not reliable
+##if we have a start date or end date and not a name for a fosa, the name is "inconnu_mais_date"
+x <- x %>%
+  mutate(hosp1_name = ifelse((!is.na(hosp1_start) | !is.na(hosp1_end)) & is.na(hosp1_name),
+                              "inconnu_mais_date", hosp1_name ),
+         hosp2_name = ifelse((!is.na(hosp2_start) | !is.na(hosp2_end)) & is.na(hosp2_name),
+                              "inconnu_mais_date", hosp2_name ),
+         hosp3_name = ifelse((!is.na(hosp3_start) | !is.na(hosp3_end)) & is.na(hosp3_name),
+                              "inconnu_mais_date", hosp3_name ),
+         hosp4_name = ifelse((!is.na(hosp4_start) | !is.na(hosp4_end)) & is.na(hosp4_name),
+                              "inconnu_mais_date", hosp4_name ),
+         hosp5_name = ifelse((!is.na(hosp5_start) | !is.na(hosp5_end)) & is.na(hosp5_name),
+                              "inconnu_mais_date", hosp5_name ),
+         hosp6_name = ifelse((!is.na(hosp6_start) | !is.na(hosp6_end)) & is.na(hosp6_name),
+                              "inconnu_mais_date", hosp6_name )
+  )
+
+##check cases where the date of entry or start is after admission date to CTE
+##if date FOSA same as date admission, patient was in FOSA and then was sent to CTE right after
+
+x <- x %>%
+  
+  mutate(check_date_fosa1 = ifelse(is.na(hosp1_start) & is.na(hosp1_end),
+                              "no_date", ifelse((hosp1_start <= date_admission | hosp1_end <= date_admission), "before_cte","after_cte" )),
+         
+        check_date_fosa2 = ifelse(is.na(hosp2_start) & is.na(hosp2_end),
+                              "no_date", ifelse((hosp2_start <= date_admission | hosp2_end <= date_admission), "before_cte","after_cte" )),
+         
+        check_date_fosa3 = ifelse(is.na(hosp3_start) & is.na(hosp3_end),
+                              "no_date", ifelse((hosp3_start <= date_admission | hosp3_end <= date_admission), "before_cte","after_cte" )),
+        
+        check_date_fosa4 =  ifelse(is.na(hosp4_start) & is.na(hosp4_end),
+                              "no_date", ifelse((hosp4_start <= date_admission | hosp4_end <= date_admission), "before_cte","after_cte" )),
+        
+       check_date_fosa5 =  ifelse(is.na(hosp5_start) & is.na(hosp5_end),
+                              "no_date", ifelse((hosp5_start <= date_admission | hosp5_end <= date_admission), "before_cte","after_cte" )),
+       
+        check_date_fosa6 =  ifelse(is.na(hosp6_start) & is.na(hosp6_end),
+                              "no_date", ifelse((hosp6_start <= date_admission | hosp6_end <= date_admission), "before_cte","after_cte" ))
+  )
+
+
+##If no admission date, we consider patient has not been to CTE
+
+##if admission date and all dates and fosa names are missing 0 FOSA visited
+
+##If name fosa (inconnu_maisdate included) and date before_cte we count it
+
+##value 0 is either we do not have admission date, so patient has not been to CTE or we do not have neither FOS name or date (so patient has not been to FOSaA or all info on this FOSA visit missing) or date visit FOSA was after CTE
+
+x <- x %>%
+  
+  mutate(value_fosa1 = ifelse(!is.na(hosp1_name)  & check_date_fosa1 %in% c("no_date", "before_cte"), 1, 0),
+                              
+           value_fosa2 = ifelse(!is.na(hosp2_name)  & check_date_fosa1 %in% c("no_date", "before_cte"), 1, 0),
+                                
+         value_fosa3 = ifelse(!is.na(hosp3_name)  & check_date_fosa3 %in% c("no_date", "before_cte"), 1, 0),
+         
+         value_fosa4 = ifelse(!is.na(hosp4_name)  & check_date_fosa4 %in% c("no_date", "before_cte"), 1, 0),
+                              
+        value_fosa5 = ifelse(!is.na(hosp5_name)  & check_date_fosa5 %in% c("no_date", "before_cte"), 1, 0),
+                             
+         value_fosa6 = ifelse(!is.na(hosp6_name)  & check_date_fosa6 %in% c("no_date", "before_cte"), 1, 0)
+  )
+
+
+
+#Final variable for number of FOSA visited before CTE
+x <- x  %>%
+  mutate(
+    #has_been_cte = ifelse(is.na(date_admission), "non", "oui" ),
+    decision_num_fosa_vis = value_fosa1 + value_fosa2 +
+           value_fosa3 + value_fosa4 + value_fosa5 + value_fosa6)
+
+
+```
+
+
+
+<!-- ====================================================== -->
+## Filter data 
+
+We keep only data with:
+
+- `epicasedef`: `confirmed` and `probable`
+
+```{r filter}
+
+to_keep <- c("confirmed", "probable")
+
+x <- x %>%
+  filter(epicasedef %in% to_keep) 
+
+```
+
+We check the total cases counts:
+
+```{r check_case_counts}
+
+x %>%
+  group_by(epicasedef) %>%
+  summarise(n = n()) %>%
+  adorn_totals("row")
+
+```
+
+
+<!-- ======================================================= -->
+## Last 21 days
+
+We duplicate the previous datasets, retaining the 21 days leading up to the
+current database date.
+
+```{r subset_21_days}
+
+start_date <- database_date - 21
+x_recent_report <- filter(x, date_report > start_date)
+x_recent_onset <- filter(x, date_onset > start_date)
+
+
+#add vlines at these dates to highlight when the definition of nosocomial infections have changed
+change_def_jan <- as.Date("2019-01-01")
+change_def_aug <- as.Date("2019-08-01")
+
+
+```
+
+
+<!-- ======================================================= -->
+## Possible nosocomial infections 
+
+We duplicate the previous datasets, retaining the cases of possible nosocimial infections only.
+
+```{r x_nosoc}
+
+ x_nosoc <- x %>%
+    filter(nosoc_infection == "oui") 
+
+```
+
+
+<!-- ====================================================== -->
+## Custom color palettes
+
+In this section we define color palettes for use in the graphics of other
+sections.
+
+```{r palettes}
+
+scale_community_death <-   scale_fill_manual(
+    name = "Décès communautaire",
+    values = c(non = "#adad85", oui = "#bf4040"),
+    labels = c(non = "Non", oui = "Oui"))
+
+scale_zone_de_sante <- scale_fill_manual(
+    name = "",
+    values = c(
+      "beni" = "#248f8f",
+      "butembo" = "#adad85",
+      "kalunguta" = "#e5bd4c",#,
+      "katwa" = "#b3003b",#,
+      "komanda" = "#61b463",
+      "lolwa" = "#9b3950",
+      "mabalako" = "#ff944d",#,
+      "mambasa" = "#4C8659", #
+      "mandima" = "#8cb3d9",#,
+      "oicha" = "#264d73",#,
+      "other" = "#b3b3b3"
+    )
+)
+
+
+scale_sous_coordination <- scale_fill_manual(
+    name = "",
+    values = c(beni = "#248f8f",
+               bukavu = "#e5bd4c",
+               bunia = "#267326",
+               butembo = "#adad85",
+               goma = "#66a3ff",
+               komanda = "#61b463",
+               mambasa = "#b3003b",
+               mangina = "#ff944d",
+               tchomia = "#ff4d4d"),
+    labels = c(beni = "Beni",
+               bukavu = "Bukavu",
+               bunia = "Bunia",
+               butembo = "Butembo",
+               goma = "Goma",
+               komanda = "Komanda",
+               mambasa = "Mambasa",
+               mangina = "Mangina",
+               tchomia = "Tchomia"))
+
+scale_sex <-   scale_fill_manual(
+    name = "",
+    values = c(female = "#ffd700", 
+               unknown = "#bfbfbf",
+               male = "#b8860b"),
+    labels = c(female = "Femmes", 
+               unknown = "Inconnu",
+               male = "Hommes"))
+
+
+scale_contact_status <-   scale_fill_manual(
+    name = "",
+    values = c(contact_inconnu = "#726200",
+               non_enregistre = "#DAC856",
+               connu_non_suivi = "#6C79B0",
+               suivi = "#09174D" 
+               ),
+    labels = c(contact_inconnu = "Contact non connu",
+               non_enregistre = "Non enregistré",
+               connu_non_suivi = "Connu, non suivi",
+               suivi = "Suivi" 
+               ))
+
+scale_notification_status <- scale_fill_manual(
+    name = "",
+    values = c(dead = "#ff5050",
+               inconnu = "#b3b3b3",
+               alive = "#9999ff"),
+    labels = c(dead = "décédé",
+               inconnu = "inconnu",
+               alive = "vivant"))
+
+scale_vaccination <- scale_fill_manual(
+    name = "",
+    values = c(no = "#ffa31a",
+               unknown = "#b8b894",
+               yes = "#40bf80"),
+    labels = c(no = "non-vacciné",
+               unknown = "inconnu",
+               yes = "vacciné"))
+
+scale_nosoc <- scale_fill_manual(
+    name = "",
+    values = c(non = "#adad85",
+               oui = "#8b4513"),
+    labels = c(non = "Autre",
+               oui = "Infection nosocomiale possible"))
+
+scale_age_class_large <- scale_fill_manual(
+    name = "",
+    values = c(`<=5` = "#90ee90",
+               `6-18` = "#9acd32",
+               `+18` = "#006400",
+               unknown= "#bfbfbf"),
+    labels = c(`<=5` = "Moins de 5 ans",
+               `6-18` = "6-18 ans",
+               `+18` = "Adultes",
+               unknown= "Inconnu"))
+
+scale_hcw <- scale_fill_manual(
+    name = "",
+    values = c(hcw = "#8b008b",
+               other = "#9370db",
+               unknown= "#dda0dd"),
+    labels = c(other = "Autres",
+               unknown= "Inconnu",
+               hcw = "Personnel de santé"
+               
+               ))
+
+
+
+#levels(x$hcw_new) <- c("Personnel de struc. de santé", "Autres", "Inconnu")
+
+
+scale_num_fosa <-   scale_fill_manual(
+    name = "Nombre de FOSA vis.",
+    values = c("0" = "#8cb3d9",
+               "1" = "#264d73",
+               "2" = "#ff9999",
+               "3" = "#ff3333",
+               "4" = "#663300",
+               "5" = "#330000",
+               inconnu= "#bfbfbf"))
+
+
+```
+
+
+<!-- ====================================================== -->
+## Outline
+
+This section provides a text summary of case counts based on dates of reporting,
+which is automatically generated from the data, as well as various tables of
+case counts.
+
+<!-- ====================================================== -->
+## Text summary
+
+```{r i}
+
+i <- incidence(x$date_report)
+i
+find_peak(i)
+
+i_7 <- incidence(x$date_report, 7)
+i_7
+find_peak(i_7)
+
+```
+
+As of **`r format(database_date, format = "%A %d %b %Y")`**, there has been a
+total of **`r sum(get_counts(i))`** cases, with a peak daily incidence of 
+**`r max(get_counts(i))`** cases reported on the **`r format(find_peak(i), format = "%a
+%d %b %Y")`**, and a peak weekly incidence of **`r max(get_counts(i_7))`** cases
+reported on the week starting on the **`r format(find_peak(i_7), format = "%a %d %b %Y")`**.
+
+
+## Possible nosocomial infections and proportions by outcome
+
+```{r table_nosoc_outcome}
+
+table_nosoc_outcome <- x %>%
+  group_by(nosoc_infection, outcome) %>%
+  tally() %>%
+  spread(outcome, n, fill = 0) %>%
+  mutate(total = dead + recovered,
+         cfr = prop_to_perc(dead / total),
+         lower_ci = prop_ci(dead, total, "lower", TRUE),
+         upper_ci = prop_ci(dead, total, "upper", TRUE))
+
+table_nosoc_outcome %>%
+  show_table(params = params)
+
+```
+
+
+
+## Possible nosocomial infections and proportions by occupation
+
+```{r table_nosoc_occup}
+
+table_nosoc_occup <- x %>%
+  group_by(hcw, nosoc_infection) %>%
+  tally() %>%
+  spread(hcw, n, fill = 0) %>%
+  mutate(Total = hcw + other + unknown,
+         Proportion_hcw = prop_to_perc(hcw / Total),
+          Proportion_other = prop_to_perc(other / Total),
+         Proportion_inconnu = prop_to_perc(unknown / Total)
+         )
+
+table_nosoc_occup %>%
+  show_table(params = params)
+
+
+```
+
+
+## Possible nosocomial infections and proportions by occupation for the past 21 days
+
+```{r table_nosoc_occup_recent}
+
+table_nosoc_occup_recent <- x_recent_report %>%
+  group_by(nosoc_infection, hcw) %>%
+  tally() %>%
+  spread(hcw, n, fill = 0) %>%
+  mutate(Total =  other,
+         Proportion = prop_to_perc(other / Total)
+         )
+
+table_nosoc_occup_recent %>%
+  show_table(params = params)
+
+
+```
+
+
+## Possible nosocomial infections and proportions by case definition and occupation
+
+```{r table_nosoc_epicasedef_occup}
+
+table_nosoc_epicasedef_occup <- x_nosoc %>%
+  group_by(nosoc_infection, epicasedef, hcw) %>%
+  tally() %>%
+  spread(hcw, n, fill = 0) %>%
+  mutate(total_casedef =  hcw + other + unknown,
+         Proportion_casedef = prop_to_perc(total_casedef /nrow(x_nosoc))
+         )
+
+table_nosoc_epicasedef_occup %>%
+  show_table(params = params)
+
+
+```
+
+<!-- ====================================================== -->
+## Possible nosocomial infection counts and proportions by sub-coordination overall
+```{r table_nosoc_sc}
+
+table_nosoc_sc <- x %>%
+  group_by(sous_coordination, nosoc_infection) %>%
+  summarise(n = n()) %>%
+  spread(nosoc_infection, n, fill = 0) %>%
+  adorn_totals(c("row", "col")) %>%
+  mutate(
+         proportion = prop_to_perc(oui / Total),
+         lower_ci = prop_ci(oui, Total, "lower", TRUE),
+         upper_ci = prop_ci(oui, Total, "upper", TRUE))
+
+
+table_nosoc_sc %>%
+  show_table(params = params)
+  
+```
+
+
+## Possible nosocomial infection counts and proportions by ZS overall
+
+```{r table_nosoc_zs}
+
+table_nosoc_zs <- x %>%
+  group_by(zone_de_sante, nosoc_infection) %>%
+  summarise(n = n()) %>%
+  spread(nosoc_infection, n, fill = 0) %>%
+  adorn_totals(c("row", "col")) %>%
+  mutate(
+         proportion = prop_to_perc(oui / Total),
+         lower_ci = prop_ci(oui, Total, "lower", TRUE),
+         upper_ci = prop_ci(oui, Total, "upper", TRUE))
+
+
+table_nosoc_zs %>%
+  show_table(params = params)
+  
+```
+
+
+## Possible nosocomial infection counts and proportions by ZS for the past 21 days
+
+```{r table_nosoc_zs_recent}
+
+table_nosoc_zs_recent <- x_recent_report %>%
+  group_by(zone_de_sante, nosoc_infection) %>%
+  summarise(n = n()) %>%
+  spread(nosoc_infection, n, fill = 0) %>%
+  adorn_totals(c("row", "col")) %>%
+  mutate(
+         proportion = prop_to_perc(oui / Total),
+         lower_ci = prop_ci(oui, Total, "lower", TRUE),
+         upper_ci = prop_ci(oui, Total, "upper", TRUE))
+
+
+table_nosoc_zs_recent %>%
+  show_table(params = params)
+  
+```
+
+## Possible nosocomial infection counts and proportions by HA overall
+
+```{r table_nosoc_ha}
+
+table_nosoc_ha <- x %>%
+  group_by(aire_de_sante, nosoc_infection) %>%
+  summarise(n = n()) %>%
+  spread(nosoc_infection, n, fill = 0) %>%
+  adorn_totals(c("row", "col")) %>%
+  mutate(
+         proportion = prop_to_perc(oui / Total),
+         lower_ci = prop_ci(oui, Total, "lower", TRUE),
+         upper_ci = prop_ci(oui, Total, "upper", TRUE))
+
+
+table_nosoc_ha %>%
+  show_table(params = params)
+  
+```
+
+
+## Possible nosocomial infection counts and proportions by HA for the past 21 days
+
+```{r table_nosoc_ha_recent}
+
+table_nosoc_ha_recent <- x_recent_report %>%
+  group_by(aire_de_sante, nosoc_infection) %>%
+  summarise(n = n()) %>%
+  spread(nosoc_infection, n, fill = 0) %>%
+  adorn_totals(c("row", "col")) %>%
+  mutate(
+         proportion = prop_to_perc(oui / Total),
+         lower_ci = prop_ci(oui, Total, "lower", TRUE),
+         upper_ci = prop_ci(oui, Total, "upper", TRUE))
+
+
+table_nosoc_ha_recent %>%
+  show_table(params = params)
+  
+```
+
+
+
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+
+
+<!-- ======================================================= -->
+# Analyses of number of possible  nosocomial infections over time
+
+
+## Overall since data has been collected
+
+
+### Figure: weekly case counts by report date and transmission type (nosocomial or not)
+
+```{r figure_report_transmission, fig.width = 10}
+
+i_report_all <- incidence(x$date_report, 7)
+
+
+i_report_nosoc <- incidence(x$date_report, 7, groups = factor(x$nosoc_infection))
+
+plot(i_report_nosoc, border = "white") +
+  geom_vline(aes(xintercept = change_def_jan), col= "grey") +
+    geom_vline(aes(xintercept = change_def_aug), col= "#ffb266") +
+  theme_bw() +
+  rotate_x_text(45) +
+  scale_nosoc +
+  theme(legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white"),
+        panel.border = element_blank(), axis.line = element_line()) +
+  large_txt + 
+  labs(title = paste0("Nombre de cas probables et confirmés d'infections à la MVE",
+                     "\npar origine à la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre de nouveaux cas \npar semaine\n") +
+  scale_months
+
+```
+
+### Table: weekly case counts by report date and transmission type (nosocomial or not)
+
+```{r table_report_transmission}
+
+table_report_transmission <- i_report_nosoc %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_transmission %>%
+  select(dates, weeks, oui, non, Total) %>%
+  show_table(params = params)
+
+```
+
+### Figure: Overall proportion of cases of possible nosocomial infections.
+
+```{r proportion_infec_noso}
+
+x_prop <- i_report_nosoc %>%
+      as_tibble()  %>%
+      mutate(total = oui + non,
+         p   = prop_to_perc(oui / total),
+         lci = prop_ci(oui, total, "lower", TRUE),
+         uci = prop_ci(oui, total, "upper", TRUE)) 
+
+ggplot(x_prop, aes(x = dates)) +
+  theme_bw() +
+  geom_ribbon(aes(ymin = lci, ymax = uci), alpha = 0.2, colour = NA) +
+  geom_point(aes(y = p), size = 2 ) +
+  geom_line(aes(y = p), size = 1,colour=  "#8b4513") + 
+   geom_vline(aes(xintercept = change_def_jan), col= "grey") +
+    geom_vline(aes(xintercept = change_def_aug), col= "#ffb266") +
+  ylim(c(0, 100)) +
+  labs(x = "",
+       y = "Proportion de cas \npar semaine\n",
+       title = paste0("Proportion de cas d'infections à la MVE",
+                     "\nd'origine nosocomiale possible à la date du ", 
+                      format(database_date, "%d/%m/%Y"))
+       ) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom", panel.border = element_blank(), axis.line = element_line()) +
+  scale_months
+
+
+```
+
+### Table: Overall proportion of cases of possible nosocomial infections.
+```{r table_proportion_infec_noso}
+
+table_proportion_infec_noso <- x_prop %>%
+  select(dates, weeks, oui, non, total) 
+  
+ table_proportion_infec_noso  %>%
+ show_table(params = params)
+
+```
+
+
+## Analysis overall by sub-coordination
+
+### Figure: weekly case counts by report date and transmission type (nosocomial or not) for the major sub-coordinations.
+
+```{r figure_report_transmission_sc, fig.width = 10}
+
+x %>% filter(top_zones != "other") %>% 
+ggplot(aes(x = epiweek_report_label, fill = nosoc_infection )) +
+  geom_bar(alpha = .7) +
+     geom_vline(aes(xintercept = change_def_jan), col= "grey") +
+    geom_vline(aes(xintercept = change_def_aug), col= "#ffb266") +
+  theme_bw() +
+  scale_nosoc +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(sous_coordination ~ .) +
+  custom_vert_facet +
+  theme(legend.position = "bottom") +
+   labs(title = paste0("Nombre de cas probables et confirmés d'infections à la MVE",
+                     "\npar origine et par sous-coordination à la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+        y = "Nombre de nouveaux cas \npar semaine\n",
+        x = "") +
+  scale_months
+
+
+```
+
+
+
+### Figure: Overall proportion of cases of possible nosocomial infections for the major sub-coordinations.
+
+```{r figure_report_proportion_sc, fig.width = 10, eval=F}
+
+x_prop_subco <- x %>% 
+  filter(top_zones != "other") %>%  
+  group_by(sous_coordination) %>%
+  count(epiweek_report_label, nosoc_infection) %>%
+  spread(nosoc_infection, n, fill = 0) %>% 
+  mutate(total = oui + non,
+         p   = prop_to_perc(oui / total),
+         lci = prop_ci(oui, total, "lower", TRUE),
+         uci = prop_ci(oui, total, "upper", TRUE)) 
+
+
+ggplot(x_prop_subco, aes(x = epiweek_report_label, col= sous_coordination)) +
+  geom_ribbon(aes(ymin = lci, ymax = uci), alpha = 0.2, colour = NA) +
+  geom_point(aes(y = p), size = 2) +
+  geom_line(aes(y = p), size = 1) + 
+  scale_color_discrete(guide = FALSE) +
+    facet_grid(sous_coordination ~ .) +
+  ylim(c(0, 100)) +
+  labs(x = "",
+       y = "Proportion de cas par semaine\n",
+       title = paste0("Proportion de cas d'infection nosocomiale \nprobable par zone de santé")) +
+  large_txt +
+  rotate_x_text(45) +
+  theme(legend.position = "bottom") +
+  scale_months
+
+
+```
+
+##Analysis overall by health zone
+
+### Figure: weekly case counts by report date and transmission type (nosocomial or not) for the major health zones.
+
+```{r figure_report_transmission_zs, fig.width = 10}
+
+x %>% filter(top_zones != "other") %>% 
+ggplot(aes(x = epiweek_report_label, fill = nosoc_infection )) +
+  geom_bar(alpha = .7) +
+  theme_bw() +
+  scale_nosoc +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(zone_de_sante ~ .) +
+  custom_vert_facet +
+  theme(legend.position = "bottom") +
+   labs(title = paste0("Nombre de cas probables et confirmés d'infections à la MVE",
+                     "\npar origine et par zone de santé à la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+        y = "Nombre de nouveaux cas \npar semaine \n",
+        x = "") +
+  scale_months
+
+
+```
+
+
+### Figure: Overall proportion of cases of possible nosocomial infections by health zone.
+
+```{r figure_report_prop_as, fig.width = 10}
+
+x_prop_as <- x %>% 
+  group_by(sous_coordination) %>%
+  count(zone_de_sante, nosoc_infection) %>%
+  spread(nosoc_infection, n, fill = 0) %>% 
+  mutate(total = oui + non,
+         p   = prop_to_perc(oui / total),
+         lci = prop_ci(oui, total, "lower", TRUE),
+         uci = prop_ci(oui, total, "upper", TRUE)) %>% 
+     filter(p != 0) 
+
+ggplot(x_prop_as, aes(x = zone_de_sante, y = p)) +
+  geom_col(aes(fill = sous_coordination)) +
+   geom_errorbar(aes(ymin=lci, ymax=uci), width=.5,
+                position=position_dodge(.9), colour= "black") + 
+ 
+  facet_grid(. ~ sous_coordination, scales = "free_x", space = "free") +
+  custom_horiz_facet +
+  scale_sous_coordination +
+  large_txt +
+  theme(legend.position = "bottom", axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 11)) +
+labs(title = paste0("Proportion d'infections à la MVE d'origine nosocomiale",
+                     "\npossible par zone de santé à la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+      x = "",
+       y = "Pourcentage d'infections \n") +
+    rotate_x_text(45)
+
+```
+
+
+### Figure: Overall proportion of cases of possible nosocomial infections by health zone for the past 21 days.
+
+```{r figure_report_prop_as_recent, fig.width = 10}
+
+x_prop_as_recent <- x_recent_report %>% 
+  group_by(sous_coordination) %>%
+  count(zone_de_sante, nosoc_infection) %>%
+  spread(nosoc_infection, n, fill = 0) %>% 
+  mutate(total = oui + non,
+         p   = prop_to_perc(oui / total),
+         lci = prop_ci(oui, total, "lower", TRUE),
+         uci = prop_ci(oui, total, "upper", TRUE),
+         label = paste0(oui, "/", total, " ", ";", " ",  round(p, 1), "%")) %>% 
+     filter(p != 0) 
+
+ggplot(x_prop_as_recent, aes(x = zone_de_sante, y = p)) +
+  geom_col(aes(fill = zone_de_sante)) +
+  geom_errorbar(aes(ymin=lci, ymax=uci), width=.5,
+                 position=position_dodge(.9), colour= "black") + 
+    geom_label(aes(label = label),  label.size = NA, size = 4, vjust = 0.15, col = "black") +
+  facet_grid(. ~ sous_coordination, scales = "free_x", space = "free") +
+  scale_zone_de_sante +
+  large_txt +
+  theme(legend.position = "bottom", axis.text.x = element_text( size = 17)) +
+  labs(title = paste0("Proportion d'infections à la MVE d'origine nosocomiale",
+                     "\npossible par zone de santé à la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+       subtitle = "Données des 3 dernières semaines",
+       x = "",
+       y = "Pourcentage d'infections \n") 
+
+
+```
+
+
+#Overall analysis of nosocomial infections by sex 
+
+### Figure: overall weekly number of nosocomial infections by sex 
+
+```{r figure_report_sex, fig.width = 14}
+
+i_report_nosoc_sex <- incidence(x_nosoc$date_report, 7, groups = factor(x_nosoc$sex))
+
+plot(i_report_nosoc_sex, border = "white") +
+  theme_bw() +
+  rotate_x_text(45) +
+  scale_sex +
+  theme(legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+  large_txt + 
+  labs(title = paste0("Nombre de cas d'infections à la MVE d'origine nosocomiale",
+                     "\npossible par sexe à la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre d'infections \npar semaine\n") +
+  scale_months
+
+
+```
+
+### Table: Overall analysis of nosocomial infections by sex 
+
+```{r table_report_sex}
+
+table_report_sex_nosoc <- i_report_nosoc_sex %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_sex_nosoc %>%
+  show_table(params = params)
+
+```
+
+
+## Analysis of possible nosocomial infections by sex  for the 3 past weeks
+
+### Table: Overall analysis of nosocomial infections by sex  for the 3 past weeks.
+
+
+```{r table_report_sex_recent}
+
+x_nosoc_recent <- x_recent_report %>%
+    filter(nosoc_infection == "oui")
+
+i_report_nosoc_sex_recent <- incidence(x_nosoc_recent$date_report, 7, groups = factor(x_nosoc_recent$sex))
+
+
+table_report_sex_nosoc_recent <- i_report_nosoc_sex_recent %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_sex_nosoc_recent %>%
+  show_table(params = params)
+
+```
+
+
+#Overall analysis of possible nosocomial infections by age 
+
+### Figure: Overall absolute number of nosocomial infections by age . 
+
+
+```{r figure_report_age, fig.width = 14}
+
+i_report_nosoc_age <- incidence(x_nosoc$date_report, 7, groups = factor(x_nosoc$age_class_large))
+
+plot(i_report_nosoc_age, border = "white") +
+  theme_bw() +
+       geom_vline(aes(xintercept = change_def_jan), col= "grey") +
+    geom_vline(aes(xintercept = change_def_aug), col= "#ffb266") +
+  rotate_x_text(45) +
+  scale_age_class_large +
+  theme(legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+  large_txt + 
+  labs(title = paste0("Nombre d'infections à la MVE d'origine nosocomiale possible","\npar classe d'âge à la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre d'infections \npar semaine\n") +
+  scale_months
+
+
+```
+
+### Figure: Overall counts of nosocomial infections by occupation: focus on epidemiological curves . 
+
+```{r figure_report_occup_variant, fig.width = 14}
+
+x_nosoc %>% filter(hcw != "unknown") %>% 
+ggplot(aes(x = epiweek_report_label)) +
+  geom_bar(alpha = .7) +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(. ~ hcw_new) +
+  custom_vert_facet +
+  theme(legend.position = "none") +
+ labs(title = paste0("Nombre d'infections à la MVE d'origine nosocomiale possible",
+                     "\npar activité à la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre d'infections \npar semaine",
+        x = "" ) +
+  scale_months
+
+```
+
+
+### Figure: Overall counts of nosocomial infections by age group and occupation . 
+
+```{r figure_report_age_occup, fig.width = 14}
+
+
+x_nosoc %>% filter(hcw != "unknown") %>% 
+ggplot(aes(x = epiweek_report_label, fill = age_class_large )) +
+  geom_bar(alpha= .8) +
+  theme_bw() +
+       geom_vline(aes(xintercept = change_def_jan), col= "grey") +
+    geom_vline(aes(xintercept = change_def_aug), col= "#ffb266") +
+  scale_age_class_large +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(. ~ hcw_new) +
+  custom_vert_facet +
+  theme(legend.position = "bottom") +
+ labs(title = paste0("Nombre d'infections à la MVE d'origine nosocomiale possible",
+                     "\npar classe d'âge et par activité à la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre d'infections \npar semaine\n",
+        x = "" ) +
+  scale_months
+
+```
+
+
+### Figure: Overall counts of nosocomial infections by age, occupation and zone de santé . 
+
+```{r figure_report_age_occup_zs, fig.width = 14}
+
+x_nosoc %>%
+  filter(hcw != "unknown", top_zones != "other") %>% 
+  
+ggplot(aes(x = epiweek_report_label, fill = age_class_large )) +
+  geom_bar(alpha= .8) +
+  theme_bw() +
+       geom_vline(aes(xintercept = change_def_jan), col= "grey") +
+    geom_vline(aes(xintercept = change_def_aug), col= "#ffb266") +
+  scale_age_class_large +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(zone_de_sante ~ hcw_new) +
+  custom_vert_facet +
+  theme(legend.position = "bottom") +
+ labs(title = paste0("Nombre d'infections à la MVE d'origine nosocomiale possible",
+                     "\npar classe d'âge, activité et par zone de santé à la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre d'infections \npar semaine\n",
+        x = "" ) +
+  scale_months
+
+
+
+```
+
+### Table: Overall analysis of possible nosocomial infections by sex 
+
+```{r table_report_age_zs}
+
+table_report_nosoc_age <- i_report_nosoc_age %>%
+  as.data.frame() %>%
+  adorn_totals(c("row", "col"))
+
+table_report_nosoc_age %>%
+  show_table(params = params)
+
+```
+
+
+## Analysis of possible nosocomial infections by age for the 3 past weeks
+
+### Figure: Counts of possible nosocomial infections by age  for the 3 past weeks.
+
+
+```{r table_report_age_recent, fig.width = 14}
+
+x_age_recent <- x_recent_report %>%
+    filter(nosoc_infection == "oui")  %>%
+  count(age_class_large, sous_coordination, zone_de_sante)
+
+
+x_age_recent %>%
+  show_table()
+
+```
+
+
+## Analysis of nosocomial infections by occupation
+
+## Affected HCW counts among possible cases of nosocomial infections  
+
+```{r table_nosoc_hcw}
+
+table_nosoc_hcw <- x%>%
+  group_by(hcw, nosoc_infection) %>%
+  summarise(n = n()) %>%
+  spread(nosoc_infection, n, fill = 0) %>%
+  adorn_totals(c("row", "col")) %>%
+  mutate(
+         Proportion= prop_to_perc(oui / Total))
+
+
+table_nosoc_hcw %>%
+  show_table()
+  
+```
+
+## Affected HCW counts among possible nosocomial infections  for the 21 past days
+
+
+```{r table_nosoc_hcw_recent, eval=F}
+
+table_nosoc_hcw_recent <- x_recent_report %>%
+  group_by(hcw, nosoc_infection) %>%
+  summarise(n = n()) %>%
+  spread(nosoc_infection, n, fill = 0) %>%
+  adorn_totals(c("row", "col")) %>%
+  mutate(
+         proportion = prop_to_perc(oui / Total),
+         lower_ci = prop_ci(oui, Total, "lower", TRUE),
+         upper_ci = prop_ci(oui, Total, "upper", TRUE))
+
+
+table_nosoc_hcw_recent %>%
+  show_table(params = params)
+  
+```
+
+### Figure: Overall absolute number of nosocomial infections by healthcare workers and other occupations.
+
+```{r figure_report_hcw, fig.width = 14}
+
+x_nosoc %>%
+ggplot( aes(x = epiweek_report_label, fill = hcw )) +
+  geom_bar(width = 9) +
+  theme_bw() +
+       geom_vline(aes(xintercept = change_def_jan), col= "grey") +
+    geom_vline(aes(xintercept = change_def_aug), col= "#ffb266") +
+  scale_hcw +
+  rotate_x_text(45) +
+  large_txt +
+  custom_vert_facet +
+ theme(legend.position = c(0, 1),
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+  labs(title = paste0("Nombre d'infections à la MVE d'origine nosocomiale possible",
+                     "\npar activité à la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre d'infections \npar semaine\n",
+        x = "" ) +
+  scale_months
+
+```
+
+
+### Figure: Overall absolute number of nosocomial infections by healthcare workers and other occupations by ZS.
+
+```{r figure_report_hcw_zs, fig.width = 14}
+
+x_nosoc %>%
+   filter(top_zones != "other")  %>%
+ggplot( aes(x = epiweek_report_label, fill = hcw )) +
+  geom_bar(width = 9) +
+  theme_bw() +
+       geom_vline(aes(xintercept = change_def_jan), col= "grey") +
+    geom_vline(aes(xintercept = change_def_aug), col= "#ffb266") +
+  scale_hcw +
+  rotate_x_text(45) +
+  large_txt +
+  facet_grid(zone_de_sante ~.) +
+  custom_vert_facet +
+ theme(legend.position = "bottom",
+        legend.justification = c(-0.05, 1.1),
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+  labs(title = paste0("Nombre d'infections à la MVE d'origine nosocomiale possible",
+                     "\npar activité et par zone de santé à la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+       y = "Nombre d'infections \npar semaine\n",
+        x = "" ) +
+  scale_months
+
+
+```
+
+## Analysis of HCF frequentation over time
+
+This analysis includes again all patients in the linelist: not possible nosocomial infections only
+
+
+### Figure: Total number of patients per FOSA visit frequency: only FOSA visited before CTE admission are taken into account
+
+```{r figure_report_fosa_freq, fig.width = 14}
+
+table_fosa_cte <- x %>%
+  filter(!is.na(date_admission)) %>%
+  group_by(decision_num_fosa_vis) %>%
+  summarise(n = n()) %>%
+   ungroup() %>% 
+  mutate( Prop = prop_to_perc(n /sum(n)))
+
+
+
+ggplot(table_fosa_cte, aes(x = factor(decision_num_fosa_vis), y= Prop, fill = decision_num_fosa_vis)) +
+  geom_col() +
+  scale_x_discrete(drop = FALSE) +
+  guides(fill = guide_legend(ncol = 2,  title= paste0("Nombre de FOSA visitées", " \n par patient"))) +
+  labs(x = "",
+       y = "Pourcentage de patients \npar nombre de visites\n",
+      title = "Distribution du nombre de FOSA visitées avant admission en CTE") +
+  theme(legend.position = "bottom") +
+  large_txt 
+```
+
+
+
+### Figure: Total number of patients per FOSA visit frequency and by occupation: only FOSA visited before CTE admission are taken into account
+
+```{r figure_report_fosa_hcw_freq, fig.width = 14}
+
+
+table_fosa_cte_hcw <- x %>%
+  filter(!is.na(date_admission)) %>%
+  group_by(decision_num_fosa_vis, hcw_new) %>%
+  summarise(n = n()) %>%
+   ungroup() %>% 
+  mutate( Prop = prop_to_perc(n /sum(n)))
+
+
+
+ggplot(table_fosa_cte_hcw, aes(x = factor(decision_num_fosa_vis), y= Prop, fill = decision_num_fosa_vis)) +
+  geom_col() +
+  scale_x_discrete(drop = FALSE) +
+  facet_grid(.~ hcw_new) +
+  guides(fill = guide_legend(ncol = 2,  title= paste0("Nombre de FOSA visitées", " \n par patient"))) +
+  labs(x = "",
+       y = "Pourcentage de patients \npar nombre de visites\n",
+      title = "Distribution du nombre de FOSA visitées avant admission en CTE et selon l'activité") +
+  theme(legend.position = "bottom") +
+  large_txt 
+```
+
+
+### Figure: Counts of visited FOSA before CTE admission over time
+
+```{r figure_report_fosa, fig.width = 14}
+
+x %>%
+    filter(!is.na(date_admission)) %>%
+ggplot(aes(x = epiweek_report_label, fill = as.factor(decision_num_fosa_vis))) +
+  geom_bar( width = 4) +
+  theme_bw() +
+  scale_num_fosa +
+  rotate_x_text(45) +
+  large_txt +
+  custom_vert_facet +
+ theme(legend.position = "bottom",
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+   labs(title = paste0("Nombre de FOSA visitées avant une admission au CTE au cours du temps",
+                     "\nà la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+        y = "Nombre de visites \npar semaine\n",
+        x = "") +
+  guides(fill = guide_legend(ncol = 2,  title= paste0("Nombre de FOSA visitées", " \n par patient"))) +
+  scale_months
+
+
+```
+
+
+### Figure: Visited FOSA counts over time by sub-co
+
+
+```{r figure_report_fosa_sc, fig.width = 14}
+
+x %>%
+    filter(!is.na(date_admission), top_zones != "other") %>%
+ggplot(aes(x = epiweek_report_label, fill = as.factor(decision_num_fosa_vis))) +
+  geom_bar(width = 4 ) +
+  theme_bw() +
+  scale_num_fosa +
+  rotate_x_text(45) +
+  facet_grid(sous_coordination ~ .) +
+  large_txt +
+  custom_vert_facet +
+ theme(legend.position = "bottom",
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+   labs(title = paste0("Nombre de FOSA visitées avant une admission au CTE au cours du temps", "\npar sous-coordinatioà la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+        y = "Nombre de visites \npar semaine\n",
+        x = "") +
+  guides(fill = guide_legend(ncol = 2,  title= paste0("Nombre de FOSA visitées", " \n par patient"))) +
+  scale_months
+
+```
+
+### Figure: Visited FOSA counts over the past 3 weeks
+
+
+```{r figure_report_fosa_recent, fig.width = 14}
+#rerun x_recent to include the latest variables created
+
+#x_recent_report <- filter(x, date_report > start_date)
+
+
+x_recent_report %>%
+    filter(!is.na(date_admission), top_zones != "other") %>%
+ggplot(aes(x = epiweek_report_label, fill = as.factor(decision_num_fosa_vis))) +
+  geom_bar( width = 0.9 ) +
+  theme_bw() +
+  scale_num_fosa +
+  rotate_x_text(45) +
+  facet_grid(sous_coordination ~ .) +
+  large_txt +
+  custom_vert_facet +
+ theme(legend.position = "bottom",
+        legend.background = element_rect(fill = "transparent", 
+                                         color = "white")) +
+   labs(title = paste0("Nombre de FOSA visitées avant une admission au CTE au cours du temps", "\npar sous-coordination à la date du ", 
+                      format(database_date, "%d/%m/%Y")),
+                subtitle= "Données des trois dernières semaines",
+        y = "Nombre de visites \npar semaine\n",
+        x = "") +
+  guides(fill = guide_legend(ncol = 2,  title= paste0("Nombre de FOSA visitées", " \n par patient"))) +
+scale_x_date(date_breaks = "1 day", date_labels =  "%d %b") 
+
+```
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# Export data and tables  {.tabset .tabset-fade .tabset-pills}
+
+
+```{r reactivate_recent, include = FALSE}
+knitr::opts_chunk$set(eval = TRUE)
+```
+
+
+
+<!-- ======================================================= -->
+## Outline
+
+Provide an outline of exported files.
+
+
+
+<!-- ======================================================= -->
+## Excel files
+
+The following code exports all tables named in `to_report` to `xslx` files,
+stored inside the folder `produced_xlsx`:
+
+```{r exports_tables, eval = TRUE}
+
+to_export <- c("table_nosoc_sc", 
+               "table_nosoc_zs", 
+               "table_nosoc_zs_recent", 
+               "table_nosoc_ha",
+               "table_nosoc_ha_recent", 
+               "table_report_nosoc_age"
+               )
+
+      
+```
+
+
+
+```{r xlsx_exports, eval = TRUE}
+
+if (!dir.exists("produced_xlsx")) {
+  dir.create("produced_xlsx")
+}
+
+
+for (e in to_export) {
+  rio::export(get(e),
+              file.path("produced_xlsx",
+                        paste0(e, ".xlsx")))
+}
+
+```
+
+Click on the following links to open the files (only works if the files above
+have been generated and are in the same folder as this document):
+
+
+```{r xlsx_links, results = "asis", eval = TRUE}
+
+for (e in to_export) {
+  txt <- sprintf("- [%s.xlsx](%s.xlsx)",
+                 e,
+                 file.path("produced_xlsx",
+                           e))
+  cat(txt, sep = "\n")
+}
+
+```
+
+
+
+<!-- ======================================================= -->
+
+
+
+
+
+
+
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+<!-- ======================================================= -->
+# System information {.tabset .tabset-fade .tabset-pills}
+
+<!-- ===================================================== -->
+## Outline
+
+The following information documents the system on which the document was
+compiled.
+
+
+
+<!-- ===================================================== -->
+## System 
+
+This provides information on the operating system.
+
+```{r system_info}
+Sys.info()
+```
+
+
+
+<!-- ===================================================== -->
+## R environment
+
+This provides information on the version of R used:
+
+```{r R_session}
+R.version
+```
+
+
+
+<!-- ===================================================== -->
+## R packages
+
+This provides information on the packages used:
+
+```{r R_pkg}
+sessionInfo()
+```
+
+
+<!-- ===================================================== -->
+## Compilation parameters
+
+This shows which parameters were passed through `params` at compilation time:
+
+```{r params}
+params
+```
+
+
+
+<!-- ===================================================== -->
+## Change log
+
+### Version 1.0.0
+
