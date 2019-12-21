@@ -2485,7 +2485,19 @@ ggplot(aes(x = decision_comparison, fill = final_outcome)) +
 ###Percentage of final status by alert status decision 
 
 ```{r final_status_percentage}
+cas <- unique(outcomes$final_outcome)
 
+if(length(which(cas%in%c("suspect")))==0){
+  perc_final_outcome <- outcomes %>%
+    filter(!is.na(final_outcome)) %>%
+  count(top_zones, decision_comparison, final_outcome) %>%
+  spread(final_outcome, n, fill = 0) %>% 
+  mutate(total= confirme + non_cas,
+    perc_confirme = prop_to_perc(confirme/total),
+         perc_non_cas = prop_to_perc(non_cas/total)) %>%
+      pivot_longer(cols = starts_with("perc"),
+   names_to = "Proportion")
+}else{
 perc_final_outcome <- outcomes %>%
     filter(!is.na(final_outcome)) %>%
   count(top_zones, decision_comparison, final_outcome) %>%
@@ -2496,7 +2508,7 @@ perc_final_outcome <- outcomes %>%
     perc_suspect = prop_to_perc(suspect/total)) %>%
       pivot_longer(cols = starts_with("perc"),
    names_to = "Proportion") 
-
+}
 
 perc_final_outcome %>% 
 ggplot(aes(x = decision_comparison, y= value, fill= Proportion)) +
@@ -2521,7 +2533,6 @@ ggplot(aes(x = decision_comparison, y= value, fill= Proportion)) +
 
 ```{r final_status_recent}
 
-
 outcomes_recent %>% 
     filter(!is.na(final_outcome)) %>%
 ggplot(aes(x = decision_comparison, fill = final_outcome)) +
@@ -2538,14 +2549,24 @@ ggplot(aes(x = decision_comparison, fill = final_outcome)) +
   large_txt +
   rotate_x_text(45) 
 
-
 ```
 
 
 ###Percentage of final status by alert status decision for the past 21 days
 
 ```{r final_status_percentage_recent}
+cas <- unique(outcomes_recent$final_outcome)
 
+if(length(which(cas%in%c("suspect")))==0){
+  perc_final_outcome_recent <- outcomes_recent %>%
+    filter(!is.na(final_outcome)) %>%
+  count(top_zones, decision_comparison, final_outcome) %>%
+  spread(final_outcome, n, fill = 0) %>% 
+  mutate(total= confirme,
+    perc_confirme = prop_to_perc(confirme/total)) %>%
+      pivot_longer(cols = starts_with("perc"),
+   names_to = "Proportion") 
+}else{
 perc_final_outcome_recent <- outcomes_recent %>%
     filter(!is.na(final_outcome)) %>%
   count(top_zones, decision_comparison, final_outcome) %>%
@@ -2555,7 +2576,7 @@ perc_final_outcome_recent <- outcomes_recent %>%
     perc_suspect = prop_to_perc(suspect/total)) %>%
       pivot_longer(cols = starts_with("perc"),
    names_to = "Proportion") 
-
+}
 
 
 perc_final_outcome_recent %>% 

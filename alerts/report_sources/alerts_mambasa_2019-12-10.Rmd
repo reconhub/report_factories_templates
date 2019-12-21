@@ -2535,16 +2535,55 @@ outcomes_recent %>%
 ###Percentage of final status by alert status decision for the past 21 days
 
 
-Only non-cases for the past 21 days as of teh database of October 14th 2019.
+Only non-cases for the past 21 days as of the database of October 14th 2019.
+
+```{r final_status_percentage_recent}
+cas <- unique(outcomes_recent$final_outcome)
+
+if(length(which(cas%in%c("confirme")))==0){
+  print("non-cases only")
+}else{
+perc_final_outcome_recent <- outcomes_recent %>%
+  filter(!is.na(final_outcome)) %>%
+  count(top_zones, decision_comparison, final_outcome) %>%
+  spread(final_outcome, n, fill = 0) %>% 
+  mutate(total= confirme + non_cas + suspect,
+         perc_confirme = prop_to_perc(confirme/total),
+         perc_suspect = prop_to_perc(suspect/total),
+         perc_non_cas = prop_to_perc(non_cas/total)) %>%
+  pivot_longer(cols = starts_with("perc"),
+               names_to = "Proportion") 
+
+
+
+perc_final_outcome_recent %>% 
+  ggplot(aes(x = decision_comparison, y= value, fill= Proportion)) +
+  geom_col(color = "white")  +
+  scale_final_outcome_perc +
+  scale_x_discrete(drop = FALSE) +
+  facet_grid(. ~ top_zones , scales = "free_y")+
+  guides(fill = guide_legend(ncol = 2)) +
+  labs(x = "",
+       y = "Pourcentage d'alertes\n",
+       title = "Distribution des alertes par statut final, \ndécision de validation et par zone de santé",
+       subtitle= "Données des 3 dernières semaines") +
+  theme(legend.position = "bottom") +
+  large_txt +
+  rotate_x_text(45)
+}
+```
 
 
 ### Table - final status overall
+Only non-cases for the past 21 days as of the database of October 14th 2019.
 
 ```{r table_final_status, fig.keep = "all"}
-
+if(length(which(cas%in%c("confirme")))==0){
+  print("non-cases only")
+}else{
 perc_final_outcome %>%
   show_table()
-
+}
 ```
 
 
@@ -2552,10 +2591,12 @@ perc_final_outcome %>%
 ### Table - final status for the past 21 days
 
 ```{r table_final_status_recent, fig.keep = "all"}
-
+if(length(which(cas%in%c("confirme")))==0){
+  print("non-cases only")
+}else{
 perc_final_outcome_recent %>%
   show_table()
-
+}
 ```
 
 <!-- ======================================================= -->
@@ -2667,10 +2708,15 @@ to_export <- c("cleaned_alerts_database_mambasa",
                "table_ha_over_time_decisions",
                "table_ha_total_recent_decisions",
                "table_ha_over_time_recent_decisions",
-               "perc_final_outcome",
-                "perc_final_outcome_recent",
                "table_unknown_as")
-               
+
+if(length(which(cas%in%c("confirme")))==0){
+  print("non-cases only")
+}else{
+  to_export <- c(to_export,
+                 "perc_final_outcome",
+                "perc_final_outcome_recent")
+}               
 ```
 
 ```{r xlsx_exports, eval = TRUE}
